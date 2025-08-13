@@ -1,25 +1,28 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Header from './components/Header';
-import Banner from './components/Banner';
-import PopularPosts from './components/PopularPosts';
-import FeatureGrid from './components/FeatureGrid';
-import BottomNavigation from './components/BottomNavigation';
-import Board from './components/Board';
-import Gallery from './components/Gallery';
-import GalleryDetail from './components/GalleryDetail';
-import Chat from './components/Chat';
-import Community from './components/Community';
-import ParkMeetings from './components/ParkMeetings';
-import AlumniSearch from './components/AlumniSearch';
-import AlumniResults from './components/AlumniResults';
-import HealthBoard from './components/HealthBoard';
-import Playground from './components/Playground';
-import JanggiGame from './components/games/JanggiGame';
-import BadukGame from './components/games/BadukGame';
-import TetrisGame from './components/games/TetrisGame';
-import YutnoriGame from './components/games/YutnoriGame';
-import GostopGame from './components/games/GostopGame';
+// App.jsx
+import React from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Header from "./components/Header";
+import Banner from "./components/Banner";
+import PopularPosts from "./components/PopularPosts";
+import FeatureGrid from "./components/FeatureGrid";
+import BottomNavigation from "./components/BottomNavigation";
+import Board from "./components/Board";
+import Gallery from "./components/Gallery";
+import GalleryDetail from "./components/GalleryDetail";
+import Chat from "./components/Chat";
+import Community from "./components/Community";
+import ParkMeetings from "./components/ParkMeetings";
+import AlumniSearch from "./components/AlumniSearch";
+import AlumniResults from "./components/AlumniResults";
+import HealthBoard from "./components/HealthBoard";
+import Playground from "./components/Playground";
+import JanggiGame from "./components/games/JanggiGame";
+import BadukGame from "./components/games/BadukGame";
+import TetrisGame from "./components/games/TetrisGame";
+import YutnoriGame from "./components/games/YutnoriGame";
+import GostopGame from "./components/games/GostopGame";
+import Signup from "./components/Signup"; // 회원가입
+import Login from "./components/Login"; // 로그인  ← 수정
 
 function HomePage() {
   return (
@@ -55,6 +58,8 @@ function App() {
         <Route path="/playground/tetris" element={<TetrisGame />} />
         <Route path="/playground/yutnori" element={<YutnoriGame />} />
         <Route path="/playground/gostop" element={<GostopGame />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/login" element={<Login />} /> {/* 로그인 라우트 추가 */}
       </Routes>
     </Router>
   );
