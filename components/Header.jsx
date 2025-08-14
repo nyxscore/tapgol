@@ -1,4 +1,6 @@
+// src/components/Header.jsx
 import React from "react";
+import { Link } from "react-router-dom";
 
 const Header = () => {
   return (
@@ -15,21 +17,30 @@ const Header = () => {
             </span>
           </div>
           <div className="flex space-x-4 text-sm text-white/90">
-            <button className="hover:text-white transition-colors font-medium">
+            <Link
+              to="/"
+              className="hover:text-white transition-colors font-medium"
+            >
               홈
-            </button>
+            </Link>
             <button className="hover:text-white transition-colors font-medium">
               꾸민소개
             </button>
-            <button className="hover:text-white transition-colors font-medium">
+            <Link
+              to="/events"
+              className="hover:text-white transition-colors font-medium"
+            >
               이벤트
-            </button>
+            </Link>
             <button className="hover:text-white transition-colors font-medium">
               갤러리
             </button>
-            <button className="bg-white/20 px-3 py-1 rounded-full hover:bg-white/30 transition-all font-medium">
+            <Link
+              to="/login"
+              className="bg-white/20 px-3 py-1 rounded-full hover:bg-white/30 transition-all font-medium"
+            >
               로그인
-            </button>
+            </Link>
           </div>
         </div>
       </div>

@@ -1,11 +1,13 @@
-// App.jsx
+// src/App.jsx
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+
 import Header from "./components/Header";
 import Banner from "./components/Banner";
 import PopularPosts from "./components/PopularPosts";
 import FeatureGrid from "./components/FeatureGrid";
 import BottomNavigation from "./components/BottomNavigation";
+
 import Board from "./components/Board";
 import Gallery from "./components/Gallery";
 import GalleryDetail from "./components/GalleryDetail";
@@ -21,8 +23,9 @@ import BadukGame from "./components/games/BadukGame";
 import TetrisGame from "./components/games/TetrisGame";
 import YutnoriGame from "./components/games/YutnoriGame";
 import GostopGame from "./components/games/GostopGame";
-import Signup from "./components/Signup"; // 회원가입
-import Login from "./components/Login"; // 로그인  ← 수정
+import Signup from "./components/Signup";
+import Login from "./components/Login";
+import Events from "./components/Events"; // ✅ 이벤트 페이지
 
 function HomePage() {
   return (
@@ -59,7 +62,13 @@ function App() {
         <Route path="/playground/yutnori" element={<YutnoriGame />} />
         <Route path="/playground/gostop" element={<GostopGame />} />
         <Route path="/signup" element={<Signup />} />
-        <Route path="/login" element={<Login />} /> {/* 로그인 라우트 추가 */}
+        <Route path="/login" element={<Login />} />
+        {/* ✅ 이벤트 라우트 추가 */}
+        <Route path="/events" element={<Events />} />
+        <Route
+          path="*"
+          element={<div style={{ padding: 16 }}>Not Found</div>}
+        />
       </Routes>
     </Router>
   );
