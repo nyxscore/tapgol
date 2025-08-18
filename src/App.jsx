@@ -26,6 +26,7 @@ import GostopGame from "./components/games/GostopGame";
 import Signup from "./components/Signup";
 import Login from "./components/Login";
 import Events from "./components/Events"; // ✅ 이벤트 페이지
+import Karaoke from "./components/Karaoke"; // ✅ 노래방 페이지
 
 function HomePage() {
   return (
@@ -65,6 +66,8 @@ function App() {
         <Route path="/login" element={<Login />} />
         {/* ✅ 이벤트 라우트 추가 */}
         <Route path="/events" element={<Events />} />
+        {/* ✅ 노래방 라우트 추가 */}
+        <Route path="/karaoke" element={<Karaoke />} />
         <Route
           path="*"
           element={<div style={{ padding: 16 }}>Not Found</div>}
