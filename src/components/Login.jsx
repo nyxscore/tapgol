@@ -83,6 +83,17 @@ const Login = () => {
             {loading ? "로그인 중..." : "로그인"}
           </button>
         </form>
+
+        {/* 가입하기 버튼 */}
+        <div className="mt-4 text-center">
+          <p className="text-gray-600">아직 계정이 없으신가요?</p>
+          <button
+            onClick={() => navigate("/signup")}
+            className="mt-2 w-full bg-gray-100 hover:bg-gray-200 text-gray-800 py-2 rounded-lg transition"
+          >
+            가입하기
+          </button>
+        </div>
       </div>
     </div>
   );
