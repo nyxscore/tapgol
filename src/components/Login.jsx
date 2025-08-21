@@ -1,6 +1,7 @@
 // src/components/Login.jsx
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import useAuth from "../contexts/useAuth";
 
 const Login = () => {
   const [id, setId] = useState("");
@@ -10,24 +11,17 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from || "/";
+  const { login } = useAuth(); // 추가
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("로그인 버튼 클릭됨");
-    console.log("로그인 시도:", { id, password });
-
     setLoading(true);
     try {
       // TODO: 실제 로그인 API 호출
-      // await api.login({ id, password });
-
-      // 데모용 딜레이
       await new Promise((r) => setTimeout(r, 500));
-
-      // 로그인 성공 시 이전 페이지 또는 홈으로 이동
+      login({ username: id }); // 로그인 상태 저장
       navigate(from, { replace: true });
     } catch (err) {
-      console.error(err);
       alert("로그인 실패");
     } finally {
       setLoading(false);

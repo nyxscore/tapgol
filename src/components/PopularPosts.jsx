@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 
 const PopularPosts = () => {
   return (
@@ -8,7 +9,10 @@ const PopularPosts = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* 첫 번째 인기글 */}
-          <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-200">
+          <Link
+            to="/board/1"
+            className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-200 block"
+          >
             <div className="p-4">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
@@ -32,10 +36,13 @@ const PopularPosts = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </Link>
 
           {/* 두 번째 인기글 */}
-          <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-200">
+          <Link
+            to="/board/2"
+            className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-200 block"
+          >
             <div className="p-4">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 rounded-lg flex items-center justify-center">
@@ -55,10 +62,13 @@ const PopularPosts = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </Link>
 
           {/* 세 번째 인기글 */}
-          <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-200">
+          <Link
+            to="/board/3"
+            className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-200 block"
+          >
             <div className="p-4">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-lg flex items-center justify-center">
@@ -83,7 +93,7 @@ const PopularPosts = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </Link>
           {/* 끝 */}
         </div>
       </div>

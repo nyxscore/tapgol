@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import BottomNavigation from './BottomNavigation';
 
 const Board = () => {
+  const { id } = useParams();
   const [posts] = useState([
     {
       id: 1,
@@ -52,6 +54,9 @@ const Board = () => {
 
   const [selectedPost, setSelectedPost] = useState(null);
 
+  // /board/:id로 접근 시 해당 게시글 보여주기
+  const postById = id ? posts.find(post => post.id === Number(id)) : null;
+
   const handlePostClick = (post) => {
     setSelectedPost(post);
   };
@@ -60,7 +65,8 @@ const Board = () => {
     setSelectedPost(null);
   };
 
-  if (selectedPost) {
+  if (postById || selectedPost) {
+    const post = postById || selectedPost;
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
         <div className="max-w-4xl mx-auto px-4 py-8 pb-20">
@@ -81,16 +87,16 @@ const Board = () => {
           {/* 게시글 상세 */}
           <div className="bg-white rounded-2xl shadow-lg p-6">
             <div className="border-b border-gray-200 pb-4 mb-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">{selectedPost.title}</h2>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">{post.title}</h2>
               <div className="flex items-center text-sm text-gray-600 space-x-4">
-                <span>작성자: {selectedPost.author}</span>
-                <span>작성일: {selectedPost.date}</span>
-                <span>조회수: {selectedPost.views}</span>
-                <span>좋아요: {selectedPost.likes}</span>
+                <span>작성자: {post.author}</span>
+                <span>작성일: {post.date}</span>
+                <span>조회수: {post.views}</span>
+                <span>좋아요: {post.likes}</span>
               </div>
             </div>
             <div className="text-gray-700 leading-relaxed">
-              {selectedPost.content}
+              {post.content}
             </div>
             
             {/* 댓글 섹션 */}
