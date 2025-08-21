@@ -10,7 +10,7 @@ const Banner = () => {
         <div className="flex flex-col md:flex-row items-center justify-between">
           {/* 가족 이미지 */}
           <div className="mb-6 md:mb-0 md:mr-8">
-            <div className="relative w-64 h-48 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl shadow-lg overflow-hidden">
+            <div className="relative w-80 h-60 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl shadow-lg overflow-hidden">
               <img
                 src="../1.jpg"
                 alt="행복한 가족"
@@ -21,7 +21,7 @@ const Banner = () => {
                 }}
               />
               <div
-                className="w-full h-full bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center text-white text-lg font-medium"
+                className="absolute inset-0 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center text-white text-lg font-medium"
                 style={{ display: "none" }}
               >
                 가족 이미지
