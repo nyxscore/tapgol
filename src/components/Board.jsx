@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import BottomNavigation from './BottomNavigation';
 
 const Board = () => {
+  const navigate = useNavigate();
   const { id } = useParams();
   const [posts] = useState([
     {
@@ -63,6 +64,9 @@ const Board = () => {
 
   const handleBackToList = () => {
     setSelectedPost(null);
+    if (id) {
+      navigate("/board");
+    }
   };
 
   if (postById || selectedPost) {
