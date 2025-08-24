@@ -30,12 +30,17 @@ import YutnoriGame from "./components/games/YutnoriGame";
 import GostopGame from "./components/games/GostopGame";
 import Signup from "./components/Signup";
 import Login from "./components/Login";
+import Profile from "./components/Profile";
 import Events from "./components/Events";
 import Karaoke from "./components/Karaoke";
 
 import { NotificationsProvider } from "./contexts/NotificationsContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import Alerts from "./pages/Alerts";
+import { auth } from "./util/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { useState, useEffect } from "react";
+
 
 function MainLayout() {
   return (
@@ -50,6 +55,15 @@ function MainLayout() {
 }
 
 function HomePage() {
+  const [user, setUser] = useState(null);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+    });
+    
+    return () => unsubscribe();
+  }, []);
+
   return (
     <>
       <Header />
@@ -89,6 +103,7 @@ export default function App() {
               <Route path="/playground/gostop" element={<GostopGame />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/profile" element={<Profile />} />
               <Route path="/events" element={<Events />} />
               <Route path="/karaoke" element={<Karaoke />} />
               <Route path="/alerts" element={<Alerts />} />

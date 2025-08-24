@@ -1,8 +1,6 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
 
 const Banner = () => {
-  const navigate = useNavigate();
 
   return (
     <section className="bg-gradient-to-r from-amber-700 to-orange-800 py-8 px-4 rounded-3xl mx-4 mt-4">
@@ -34,15 +32,9 @@ const Banner = () => {
             <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">
               그 시절의 웃음, 오늘 다시
             </h1>
-            <p className="text-lg text-amber-100 mb-6">
-              지금 가입하시고 이웃과 소통을 시작해보세요!
+            <p className="text-lg text-amber-100">
+              이웃과 소통을 시작해보세요!
             </p>
-            <button
-              className="bg-white hover:bg-gray-100 text-amber-700 font-semibold py-3 px-8 rounded-lg transition-colors duration-200 shadow-md"
-              onClick={() => navigate("/signup")}
-            >
-              가입하기
-            </button>
           </div>
         </div>
       </div>
