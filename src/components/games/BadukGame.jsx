@@ -92,7 +92,7 @@ const BadukGame = () => {
 
           <div className="text-center">
             <p className="text-sm text-gray-600">
-              간단한 바둑게임입니다. 빈 칸을 클릭하여 돌을 놓을 수 있습니다.
+              간단한 오목목게임입니다. 빈 칸을 클릭하여 돌을 놓을 수 있습니다.
             </p>
           </div>
         </div>

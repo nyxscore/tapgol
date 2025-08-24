@@ -1,16 +1,48 @@
 // src/components/BottomNavigation.jsx
-import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { useNotifications } from "../contexts/NotificationsContext";
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { auth } from "../util/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { subscribeToUnreadChatCount } from "../util/notificationService";
 
 const BottomNavigation = () => {
-  const location = useLocation();
   const navigate = useNavigate();
-  const { unreadCount } = useNotifications() || { unreadCount: 0 };
+  const location = useLocation();
+  const [user, setUser] = useState(null);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const unsubscribeRef = useRef(null);
+  const chatNotificationUnsubscribeRef = useRef(null);
 
-  const navItems = [
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    // 읽지 않은 채팅 알림 개수 구독
+    if (user) {
+      try {
+        chatNotificationUnsubscribeRef.current = subscribeToUnreadChatCount((count) => {
+          setUnreadChatCount(count);
+        });
+      } catch (error) {
+        console.error("채팅 알림 개수 구독 오류:", error);
+      }
+    }
+
+    return () => {
+      if (chatNotificationUnsubscribeRef.current) {
+        chatNotificationUnsubscribeRef.current();
+      }
+    };
+  }, [user]);
+
+  const navigationItems = [
     {
-      id: 1,
+      id: 0,
       name: "홈",
       path: "/",
       icon: (
@@ -20,23 +52,20 @@ const BottomNavigation = () => {
       ),
     },
     {
-      id: 2,
-      name: "채팅",
-      path: "/chat",
+      id: 1,
+      name: "탑골톡",
+      path: "/tapgol-chat",
       icon: (
         <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-          <path
-            fillRule="evenodd"
-            d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z"
-            clipRule="evenodd"
-          />
+          <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
         </svg>
       ),
+      badge: unreadChatCount > 0 ? unreadChatCount : null
     },
     {
-      id: 3,
+      id: 2,
       name: "알림",
-      path: "/alerts",
+      path: "/notification-board",
       icon: (
         <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
           <path d="M10 2a6 6 0 00-6 6v2.586l-.707.707A1 1 0 004 13h12a1 1 0 00.707-1.707L16 10.586V8a6 6 0 00-6-6z" />
@@ -45,53 +74,41 @@ const BottomNavigation = () => {
       ),
     },
     {
-      id: 4,
-      name: "내정보",
+      id: 3,
+      name: "프로필",
       path: "/profile",
       icon: (
         <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-          <path
-            fillRule="evenodd"
-            d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-            clipRule="evenodd"
-          />
+          <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
         </svg>
       ),
     },
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-gray-800 border-t border-gray-700 shadow-lg rounded-t-3xl mx-4 mb-2">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-around">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
-            const isAlerts = item.path === "/alerts";
-
-            return (
-              <button
-                key={item.id}
-                onClick={() => navigate(item.path)}
-                className={
-                  "relative flex flex-col items-center py-3 px-4 flex-1 transition-colors duration-200 " +
-                  (isActive
-                    ? "text-white"
-                    : "text-gray-400 hover:text-gray-300")
-                }
-              >
-                {item.icon}
-
-                {isAlerts && unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-6 min-w-[18px] h-[18px] px-1 text-[10px] leading-[18px] text-white bg-red-500 rounded-full text-center shadow animate-pulse">
-                    {unreadCount}
-                  </span>
-                )}
-
-                <span className="text-xs mt-1 font-medium">{item.name}</span>
-              </button>
-            );
-          })}
-        </div>
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
+      <div className="flex justify-around">
+        {navigationItems.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => navigate(item.path)}
+            className={`flex flex-col items-center py-2 px-3 flex-1 relative ${
+              location.pathname === item.path
+                ? "text-amber-600"
+                : "text-gray-500 hover:text-gray-700"
+            } transition-colors`}
+          >
+            <div className="relative">
+              {item.icon}
+              {item.badge && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center min-w-[20px]">
+                  {item.badge > 99 ? '99+' : item.badge}
+                </span>
+              )}
+            </div>
+            <span className="text-xs mt-1">{item.name}</span>
+          </button>
+        ))}
       </div>
     </nav>
   );

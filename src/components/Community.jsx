@@ -1,7 +1,5 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import Header from './Header';
-import BottomNavigation from './BottomNavigation';
 
 const Community = () => {
   const navigate = useNavigate();
@@ -69,7 +67,6 @@ const Community = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
-      <Header />
       <main className="pb-20 pt-16">
         <div className="max-w-4xl mx-auto px-4">
           <div className="mb-6">
@@ -99,19 +96,9 @@ const Community = () => {
                   <p className="text-sm text-gray-600 mb-3 line-clamp-2">
                     {park.description}
                   </p>
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <div className="flex items-center space-x-1">
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
-                      </svg>
-                      <span>{park.memberCount}명</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                      </svg>
-                      <span>{park.upcomingMeetings}개 모임</span>
-                    </div>
+                  <div className="flex justify-between text-sm text-gray-500">
+                    <span>멤버 {park.memberCount}명</span>
+                    <span>모임 {park.upcomingMeetings}개</span>
                   </div>
                 </div>
               </div>
@@ -119,7 +106,6 @@ const Community = () => {
           </div>
         </div>
       </main>
-      <BottomNavigation />
     </div>
   );
 };

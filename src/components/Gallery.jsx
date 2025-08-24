@@ -1,154 +1,242 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "./Header";
-import BottomNavigation from "./BottomNavigation";
+import { auth } from "../util/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { getGalleryItems, toggleLike, incrementViews } from "../util/galleryService";
 
 const Gallery = () => {
   const navigate = useNavigate();
-  const [posts, setPosts] = useState([
-    {
-      id: 1,
-      title: "오늘의 맛집 탐방",
-      author: "맛집러버",
-      image: "../맛집사진.jpg",
-      content: "오늘 발견한 정말 맛있는 음식점을 공유합니다!",
-      likes: 24,
-      comments: 8,
-      date: "2024-01-15",
-    },
-    {
-      id: 2,
-      title: "주말 등산 후기",
-      author: "산사랑",
-      image:
-        "https://images.unsplash.com/photo-1551632811-561732d1e306?w=400&h=300&fit=crop",
-      content: "주말에 등산 다녀왔는데 정말 아름다운 풍경이었어요.",
-      likes: 42,
-      comments: 15,
-      date: "2024-01-14",
-    },
-    {
-      id: 3,
-      title: "새로 산 카메라로 찍은 사진",
-      author: "포토그래퍼",
-      image:
-        "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=400&h=300&fit=crop",
-      content: "새로 구매한 카메라로 찍은 첫 사진입니다.",
-      likes: 67,
-      comments: 23,
-      date: "2024-01-13",
-    },
-    {
-      id: 4,
-      title: "집에서 만든 수제 쿠키",
-      author: "베이킹마스터",
-      image:
-        "https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=400&h=300&fit=crop",
-      content: "오늘 집에서 만든 수제 쿠키입니다. 정말 맛있어요!",
-      likes: 89,
-      comments: 31,
-      date: "2024-01-12",
-    },
-    {
-      id: 5,
-      title: "강아지와의 산책",
-      author: "펫러버",
-      image:
-        "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=400&h=300&fit=crop",
-      content: "우리 강아지와 함께한 즐거운 산책 시간입니다.",
-      likes: 156,
-      comments: 45,
-      date: "2024-01-11",
-    },
-    {
-      id: 6,
-      title: "일몰 사진",
-      author: "자연사랑",
-      image:
-        "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop",
-      content: "오늘 저녁에 찍은 아름다운 일몰 사진입니다.",
-      likes: 203,
-      comments: 67,
-      date: "2024-01-10",
-    },
-  ]);
+  const [items, setItems] = useState([]);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const handlePostClick = (postId) => {
-    navigate(`/gallery/${postId}`);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+
+    loadGalleryItems();
+    return () => unsubscribe();
+  }, []);
+
+  const loadGalleryItems = async () => {
+    try {
+      const galleryData = await getGalleryItems();
+      setItems(galleryData);
+    } catch (error) {
+      console.error("갤러리 로드 오류:", error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleItemClick = async (itemId) => {
+    try {
+      // 조회수 증가 (로그인한 사용자만)
+      if (user) {
+        await incrementViews(itemId);
+      }
+      navigate(`/gallery/${itemId}`);
+    } catch (error) {
+      console.error("조회수 증가 오류:", error);
+      navigate(`/gallery/${itemId}`);
+    }
+  };
+
+  const handleUploadClick = () => {
+    if (!user) {
+      alert("업로드를 하려면 로그인이 필요합니다.");
+      navigate("/login");
+      return;
+    }
+    navigate("/gallery/upload");
+  };
+
+  const handleLike = async (e, itemId) => {
+    e.stopPropagation(); // 이벤트 버블링 방지
+    
+    if (!user) {
+      alert("좋아요를 누르려면 로그인이 필요합니다.");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const isLiked = await toggleLike(itemId, user.uid);
+      
+      // 로컬 상태 업데이트
+      setItems(prev => prev.map(item => {
+        if (item.id === itemId) {
+          return {
+            ...item,
+            likes: isLiked ? (item.likes || 0) + 1 : (item.likes || 0) - 1,
+            likedBy: isLiked 
+              ? [...(item.likedBy || []), user.uid]
+              : (item.likedBy || []).filter(uid => uid !== user.uid)
+          };
+        }
+        return item;
+      }));
+    } catch (error) {
+      console.error("좋아요 처리 오류:", error);
+      alert("좋아요 처리에 실패했습니다.");
+    }
+  };
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return "";
+    
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  };
+
+  const isLikedByUser = (item) => {
+    return user && item.likedBy?.includes(user.uid);
+  };
+
+  const getFileTypeIcon = (fileType) => {
+    if (fileType === 'image') {
+      return (
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+        </svg>
+      );
+    } else if (fileType === 'video') {
+      return (
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+        </svg>
+      );
+    }
+    return null;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
+        <main className="pb-20 pt-16">
+          <div className="max-w-4xl mx-auto px-4">
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-700 mx-auto mb-4"></div>
+              <p className="text-amber-700">갤러리를 불러오는 중...</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
-      <Header />
       <main className="pb-20 pt-16">
         <div className="max-w-4xl mx-auto px-4">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">갤러리</h1>
+            <div className="flex items-center justify-between mb-2">
+              <h1 className="text-2xl font-bold text-gray-800">갤러리</h1>
+              <button
+                onClick={handleUploadClick}
+                className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center space-x-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>업로드</span>
+              </button>
+            </div>
             <p className="text-gray-600">
-              사진과 함께하는 이야기들을 확인해보세요
+              사진과 동영상을 공유해보세요
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {posts.map((post) => (
-              <div
-                key={post.id}
-                onClick={() => handlePostClick(post.id)}
-                className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transform transition-transform hover:scale-105 hover:shadow-lg"
+          {items.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-6xl mb-4">📷</div>
+              <p className="text-gray-600 text-lg mb-2">아직 업로드된 파일이 없습니다</p>
+              <p className="text-gray-500 mb-6">첫 번째 파일을 업로드해보세요!</p>
+              <button
+                onClick={handleUploadClick}
+                className="bg-amber-600 text-white px-6 py-3 rounded-lg hover:bg-amber-700 transition-colors"
               >
-                <div className="relative">
-                  <img
-                    src={post.image}
-                    alt={post.title}
-                    className="w-full h-48 object-cover"
-                  />
-                  <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-                    {post.date}
-                  </div>
-                </div>
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-800 mb-2 line-clamp-2">
-                    {post.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                    {post.content}
-                  </p>
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <span className="font-medium">{post.author}</span>
-                    <div className="flex items-center space-x-3">
-                      <div className="flex items-center space-x-1">
-                        <svg
-                          className="w-4 h-4"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                        </svg>
-                        <span>{post.likes}</span>
+                파일 업로드하기
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => handleItemClick(item.id)}
+                  className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transform transition-transform hover:scale-105 hover:shadow-lg"
+                >
+                  <div className="relative">
+                    {item.fileTypeCategory === 'image' ? (
+                      <img
+                        src={item.fileUrl}
+                        alt={item.title}
+                        className="w-full h-48 object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-48 bg-gray-200 flex items-center justify-center relative">
+                        <video
+                          src={item.fileUrl}
+                          className="w-full h-full object-cover"
+                          muted
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
+                          <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                          </svg>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <svg
-                          className="w-4 h-4"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
+                    )}
+                    <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded flex items-center space-x-1">
+                      {getFileTypeIcon(item.fileTypeCategory)}
+                      <span>{formatDate(item.createdAt)}</span>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-gray-800 mb-2 line-clamp-2">
+                      {item.title}
+                    </h3>
+                    {item.description && (
+                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                        {item.description}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between text-sm text-gray-500">
+                      <span className="font-medium">{item.uploader}</span>
+                      <div className="flex items-center space-x-3">
+                        <button
+                          onClick={(e) => handleLike(e, item.id)}
+                          className={`flex items-center space-x-1 transition-colors ${
+                            isLikedByUser(item) ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
+                          }`}
                         >
-                          <path
-                            fillRule="evenodd"
-                            d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        <span>{post.comments}</span>
+                          <svg className="w-4 h-4" fill={isLikedByUser(item) ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                          </svg>
+                          <span>{item.likes || 0}</span>
+                        </button>
+                        <div className="flex items-center space-x-1">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                            <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                          </svg>
+                          <span>{item.views || 0}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </main>
-      <BottomNavigation />
     </div>
   );
 };

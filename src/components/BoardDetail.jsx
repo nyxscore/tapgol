@@ -2,13 +2,13 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { getGalleryItem, incrementViews, deleteGalleryItem, toggleLike } from "../util/galleryService";
-import GalleryCommentSection from "./GalleryCommentSection";
+import { getPost, incrementViews, deletePost, toggleLike } from "../util/postService";
+import CommentSection from "./CommentSection";
 
-const GalleryDetail = () => {
+const BoardDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [item, setItem] = useState(null);
+  const [post, setPost] = useState(null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
@@ -19,26 +19,26 @@ const GalleryDetail = () => {
       setUser(currentUser);
     });
 
-    const loadItem = async () => {
+    const loadPost = async () => {
       try {
-        const itemData = await getGalleryItem(id);
-        setItem(itemData);
+        const postData = await getPost(id);
+        setPost(postData);
         
         // 조회수 증가 (로그인한 사용자만)
         if (user) {
           await incrementViews(id);
         }
       } catch (error) {
-        console.error("갤러리 항목 로드 오류:", error);
-        alert("갤러리 항목을 불러오는데 실패했습니다.");
-        navigate("/gallery");
+        console.error("게시글 로드 오류:", error);
+        alert("게시글을 불러오는데 실패했습니다.");
+        navigate("/board");
       } finally {
         setLoading(false);
       }
     };
 
     if (id) {
-      loadItem();
+      loadPost();
     }
 
     return () => unsubscribe();
@@ -57,37 +57,35 @@ const GalleryDetail = () => {
     });
   };
 
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
   const handleDelete = async () => {
-    if (!user || user.uid !== item.uploaderId) {
+    if (!user || user.uid !== post.authorId) {
       alert("삭제 권한이 없습니다.");
       return;
     }
 
-    if (!window.confirm("정말로 이 파일을 삭제하시겠습니까?")) {
+    if (!window.confirm("정말로 이 게시글을 삭제하시겠습니까?")) {
       return;
     }
 
     setDeleting(true);
     try {
-      await deleteGalleryItem(id, item.fileName);
-      alert("파일이 삭제되었습니다.");
-      navigate("/gallery");
+      await deletePost(id);
+      alert("게시글이 삭제되었습니다.");
+      navigate("/board");
     } catch (error) {
-      console.error("파일 삭제 오류:", error);
-      alert("파일 삭제에 실패했습니다.");
+      console.error("게시글 삭제 오류:", error);
+      alert("게시글 삭제에 실패했습니다.");
     } finally {
       setDeleting(false);
     }
+  };
+
+  const handleEdit = () => {
+    if (!user || user.uid !== post.authorId) {
+      alert("수정 권한이 없습니다.");
+      return;
+    }
+    navigate(`/board/edit/${id}`);
   };
 
   const handleLike = async () => {
@@ -104,7 +102,7 @@ const GalleryDetail = () => {
       const isLiked = await toggleLike(id, user.uid);
       
       // 로컬 상태 업데이트
-      setItem(prev => ({
+      setPost(prev => ({
         ...prev,
         likes: isLiked ? (prev.likes || 0) + 1 : (prev.likes || 0) - 1,
         likedBy: isLiked 
@@ -126,36 +124,37 @@ const GalleryDetail = () => {
     }
   };
 
-  const isLiked = user && item?.likedBy?.includes(user.uid);
-  const isAuthor = user && user.uid === item?.uploaderId;
+  const isLiked = user && post?.likedBy?.includes(user.uid);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-700 mx-auto mb-4"></div>
-          <p className="text-amber-700">갤러리 항목을 불러오는 중...</p>
+          <p className="text-amber-700">게시글을 불러오는 중...</p>
         </div>
       </div>
     );
   }
 
-  if (!item) {
+  if (!post) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center">
         <div className="text-center">
           <div className="text-gray-400 text-6xl mb-4">📄</div>
-          <p className="text-gray-600 text-lg mb-2">갤러리 항목을 찾을 수 없습니다</p>
+          <p className="text-gray-600 text-lg mb-2">게시글을 찾을 수 없습니다</p>
           <button
-            onClick={() => navigate("/gallery")}
+            onClick={() => navigate("/board")}
             className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors"
           >
-            갤러리로 돌아가기
+            게시판으로 돌아가기
           </button>
         </div>
       </div>
     );
   }
+
+  const isAuthor = user && user.uid === post.authorId;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 pb-20">
@@ -164,27 +163,38 @@ const GalleryDetail = () => {
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
           <div className="flex items-center justify-between">
             <button
-              onClick={() => navigate("/gallery")}
+              onClick={() => navigate("/board")}
               className="flex items-center text-amber-700 hover:text-amber-800 font-medium"
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              갤러리로 돌아가기
+              목록으로 돌아가기
             </button>
-            <h1 className="text-2xl font-bold text-gray-800">갤러리 상세</h1>
+            <h1 className="text-2xl font-bold text-gray-800">게시글</h1>
             <div className="w-24"></div>
           </div>
         </div>
 
-        {/* 갤러리 항목 내용 */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-          {/* 항목 헤더 */}
+        {/* 게시글 내용 */}
+        <div className="bg-white rounded-2xl shadow-xl p-6">
+          {/* 게시글 헤더 */}
           <div className="border-b border-gray-200 pb-6 mb-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-gray-800">{item.title}</h2>
+              <div className="flex items-center space-x-2">
+                <h2 className="text-2xl font-bold text-gray-800">{post.title}</h2>
+                <span className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm font-semibold">
+                  {post.category || "일반"}
+                </span>
+              </div>
               {isAuthor && (
                 <div className="flex space-x-2">
+                  <button
+                    onClick={handleEdit}
+                    className="px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                  >
+                    수정
+                  </button>
                   <button
                     onClick={handleDelete}
                     disabled={deleting}
@@ -202,77 +212,24 @@ const GalleryDetail = () => {
             
             <div className="flex items-center justify-between text-sm text-gray-600">
               <div className="flex items-center space-x-4">
-                <span>업로더: <span className="font-semibold">{item.uploader}</span></span>
-                <span>업로드일: {formatDate(item.createdAt)}</span>
-                {item.updatedAt && item.updatedAt !== item.createdAt && (
-                  <span>수정일: {formatDate(item.updatedAt)}</span>
+                <span>작성자: <span className="font-semibold">{post.author}</span></span>
+                <span>작성일: {formatDate(post.createdAt)}</span>
+                {post.updatedAt && post.updatedAt !== post.createdAt && (
+                  <span>수정일: {formatDate(post.updatedAt)}</span>
                 )}
               </div>
               <div className="flex items-center space-x-4">
-                <span>조회수: {item.views || 0}</span>
-                <span>좋아요: {item.likes || 0}</span>
+                <span>조회수: {post.views || 0}</span>
+                <span>좋아요: {post.likes || 0}</span>
               </div>
             </div>
           </div>
 
-          {/* 파일 표시 */}
+          {/* 게시글 본문 */}
           <div className="mb-8">
-            {item.fileTypeCategory === 'image' ? (
-              <div className="text-center">
-                <img
-                  src={item.fileUrl}
-                  alt={item.title}
-                  className="max-w-full h-auto rounded-lg shadow-lg mx-auto"
-                  style={{ maxHeight: '70vh' }}
-                />
-              </div>
-            ) : (
-              <div className="text-center">
-                <video
-                  src={item.fileUrl}
-                  controls
-                  className="max-w-full h-auto rounded-lg shadow-lg mx-auto"
-                  style={{ maxHeight: '70vh' }}
-                >
-                  브라우저가 비디오를 지원하지 않습니다.
-                </video>
-              </div>
-            )}
-          </div>
-
-          {/* 설명 */}
-          {item.description && (
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">설명</h3>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-gray-700 whitespace-pre-wrap">{item.description}</p>
-              </div>
-            </div>
-          )}
-
-          {/* 파일 정보 */}
-          <div className="mb-8">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">파일 정보</h3>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-600">파일명</p>
-                  <p className="font-medium">{item.originalName}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">파일 크기</p>
-                  <p className="font-medium">{formatFileSize(item.fileSize)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">파일 타입</p>
-                  <p className="font-medium">{item.fileType}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">파일 종류</p>
-                  <p className="font-medium">
-                    {item.fileTypeCategory === 'image' ? '이미지' : '동영상'}
-                  </p>
-                </div>
+            <div className="prose max-w-none">
+              <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+                {post.content}
               </div>
             </div>
           </div>
@@ -302,7 +259,7 @@ const GalleryDetail = () => {
                   />
                 </svg>
                 <span>
-                  {liking ? "처리 중..." : isLiked ? "좋아요 취소" : "좋아요"} {item.likes || 0}
+                  {liking ? "처리 중..." : isLiked ? "좋아요 취소" : "좋아요"} {post.likes || 0}
                 </span>
               </button>
             </div>
@@ -322,12 +279,12 @@ const GalleryDetail = () => {
         </div>
 
         {/* 댓글 섹션 */}
-        <div className="bg-white rounded-2xl shadow-xl p-6">
-          <GalleryCommentSection galleryId={id} />
+        <div className="bg-white rounded-2xl shadow-xl p-6 mt-6">
+          <CommentSection postId={id} />
         </div>
       </div>
     </div>
   );
 };
 
-export default GalleryDetail;
+export default BoardDetail;

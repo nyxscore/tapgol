@@ -1,0 +1,245 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 사용자 컬렉션 규칙
+    match /users/{userId} {
+      // 읽기: 본인만 읽기 가능
+      allow read: if request.auth != null && request.auth.uid == userId;
+      
+      // 쓰기: 본인만 쓰기 가능 (회원가입 시에만 생성 가능)
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // 게시글 컬렉션 규칙
+    match /posts/{postId} {
+      // 모든 인증된 사용자가 읽기 가능
+      allow read: if request.auth != null;
+      // 인증된 사용자만 작성 가능
+      allow create: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      // 작성자만 수정 가능
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      // 작성자만 삭제 가능
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+    }
+    
+    // 댓글 컬렉션 규칙
+    match /comments/{commentId} {
+      // 모든 인증된 사용자가 읽기 가능
+      allow read: if request.auth != null;
+      // 인증된 사용자만 작성 가능
+      allow create: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      // 작성자만 수정 가능
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      // 작성자만 삭제 가능
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+    }
+    
+    // 갤러리 컬렉션 규칙
+    match /gallery/{itemId} {
+      // 모든 인증된 사용자가 읽기 가능
+      allow read: if request.auth != null;
+      // 인증된 사용자만 작성 가능
+      allow create: if request.auth != null && 
+        request.auth.uid == resource.data.uploaderId;
+      // 작성자만 수정 가능
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.uploaderId;
+      // 작성자만 삭제 가능
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.uploaderId;
+    }
+    
+    // 갤러리 댓글 컬렉션 규칙
+    match /galleryComments/{commentId} {
+      // 모든 인증된 사용자가 읽기 가능
+      allow read: if request.auth != null;
+      // 인증된 사용자만 작성 가능
+      allow create: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      // 작성자만 수정 가능
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      // 작성자만 삭제 가능
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+    }
+    
+    // 노래방 게시글 컬렉션 규칙
+    match /karaokePosts/{postId} {
+      // 모든 인증된 사용자가 읽기 가능
+      allow read: if request.auth != null;
+      // 인증된 사용자만 작성 가능
+      allow create: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      // 작성자만 수정 가능
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      // 작성자만 삭제 가능
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+    }
+    
+    // 노래방 댓글 컬렉션 규칙
+    match /karaokeComments/{commentId} {
+      // 모든 인증된 사용자가 읽기 가능
+      allow read: if request.auth != null;
+      // 인증된 사용자만 작성 가능
+      allow create: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      // 작성자만 수정 가능
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      // 작성자만 삭제 가능
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+    }
+    
+    // 건강정보 게시글 컬렉션 규칙
+    match /healthPosts/{postId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+    }
+    
+    // 건강정보 댓글 컬렉션 규칙
+    match /healthComments/{commentId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+    }
+    
+    // 메시지 컬렉션 규칙
+    match /messages/{messageId} {
+      allow read: if request.auth != null && 
+        (request.auth.uid == resource.data.senderId || 
+         request.auth.uid == resource.data.receiverId);
+      allow create: if request.auth != null && 
+        request.auth.uid == resource.data.senderId;
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.senderId;
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.senderId;
+    }
+    
+    // 채팅방 컬렉션 규칙
+    match /chatrooms/{roomId} {
+      // 읽기: 채팅방 참여자만
+      allow read: if request.auth != null && 
+        request.auth.uid in resource.data.participants;
+      
+      // 쓰기: 채팅방 참여자만
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && 
+        request.auth.uid in resource.data.participants;
+      allow delete: if request.auth != null && 
+        request.auth.uid in resource.data.participants;
+    }
+    
+    // 접속자 컬렉션 규칙
+    match /onlineUsers/{userId} {
+      // 읽기: 모든 인증된 사용자
+      allow read: if true;
+      
+      // 쓰기: 본인만
+      allow create: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      
+      // 수정/삭제: 본인만
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+    }
+    
+    // 알림 컬렉션 규칙
+    match /notifications/{notificationId} {
+      // 읽기: 모든 사용자
+      allow read: if true;
+      
+      // 쓰기: 관리자만
+      allow create: if request.auth != null && 
+        (request.auth.token.role == "admin" || 
+         request.auth.token.email == "admin@tapgol.com");
+      
+      // 수정/삭제: 관리자만
+      allow update: if request.auth != null && 
+        (request.auth.token.role == "admin" || 
+         request.auth.token.email == "admin@tapgol.com");
+      allow delete: if request.auth != null && 
+        (request.auth.token.role == "admin" || 
+         request.auth.token.email == "admin@tapgol.com");
+    }
+    
+    // 이벤트 컬렉션 규칙
+    match /events/{eventId} {
+      // 읽기: 모든 인증된 사용자
+      allow read: if request.auth != null;
+      
+      // 쓰기: 관리자만 (필요시 수정)
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
+    
+    // 채팅 메시지 컬렉션 규칙
+    match /chatMessages/{messageId} {
+      // 읽기: 모든 인증된 사용자 (게스트도 읽기 가능)
+      allow read: if true;
+      
+      // 쓰기: 인증된 사용자만
+      allow create: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      
+      // 수정/삭제: 작성자만
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.authorId;
+    }
+  }
+}
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // 갤러리 폴더 규칙
+    match /gallery/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null 
+        && request.resource.size < 50 * 1024 * 1024 // 50MB 제한
+        && request.resource.contentType.matches('image/.*|video/.*'); // 이미지/비디오만 허용
+      allow delete: if request.auth != null 
+        && fileName.matches(request.auth.uid + '_.*');
+    }
+    
+    // 노래방 폴더 규칙
+    match /karaoke/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null 
+        && request.resource.size < 100 * 1024 * 1024 // 100MB 제한
+        && request.resource.contentType.matches('video/.*'); // 비디오만 허용
+      allow delete: if request.auth != null 
+        && fileName.matches(request.auth.uid + '_.*');
+    }
+    
+    // 기본 규칙 - 모든 접근 거부
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,198 +1,214 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import BottomNavigation from './BottomNavigation';
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { auth } from "../util/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { getPosts } from "../util/postService";
 
 const Board = () => {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
   const navigate = useNavigate();
-  const { id } = useParams();
-  const [posts] = useState([
-    {
-      id: 1,
-      title: "오늘 공원에서 만난 이웃분들",
-      author: "김철수",
-      date: "2024-01-15",
-      views: 45,
-      likes: 12,
-      content: "오늘 탑골공원에서 산책하다가 이웃분들과 인사를 나눴는데, 정말 따뜻한 분들이셨어요. 이런 소통이 참 좋은 것 같습니다."
-    },
-    {
-      id: 2,
-      title: "공원 정화 활동 후기",
-      author: "이영희",
-      date: "2024-01-14",
-      views: 32,
-      likes: 8,
-      content: "지난주에 진행한 공원 정화 활동에 참여했는데, 많은 분들이 함께해주셔서 감사했습니다. 다음에도 참여하고 싶어요!"
-    },
-    {
-      id: 3,
-      title: "새로 오신 이웃분 환영합니다",
-      author: "박민수",
-      date: "2024-01-13",
-      views: 67,
-      likes: 15,
-      content: "우리 동네에 새로 이사 오신 분들 환영합니다! 탑골공원에서 자주 만나뵙길 바라며, 따뜻한 이웃이 되었으면 좋겠어요."
-    },
-    {
-      id: 4,
-      title: "공원 벚꽃 개화 소식",
-      author: "최미영",
-      date: "2024-01-12",
-      views: 89,
-      likes: 23,
-      content: "탑골공원의 벚꽃이 곧 피기 시작할 것 같아요. 벚꽃 축제도 계획 중이라고 하니 기대가 됩니다!"
-    },
-    {
-      id: 5,
-      title: "이웃 간 도움 요청",
-      author: "정수진",
-      date: "2024-01-11",
-      views: 28,
-      likes: 6,
-      content: "혹시 우리 동네에서 개를 키우시는 분 계신가요? 강아지 산책 팁을 여쭤보고 싶어요."
+
+  useEffect(() => {
+    // 로그인 상태 확인
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+
+    // 게시글 데이터 로드
+    const loadPosts = async () => {
+      try {
+        const postsData = await getPosts(20);
+        setPosts(postsData);
+      } catch (error) {
+        console.error("게시글 로드 오류:", error);
+        // 에러 시 기본 데이터 표시
+        setPosts([
+          {
+            id: 1,
+            title: "탑골공원에서 만난 할머니",
+            author: "김할배",
+            date: "2024-01-15",
+            views: 156,
+            likes: 23,
+          },
+          {
+            id: 2,
+            title: "오늘 바둑 대회 결과",
+            author: "이장로",
+            date: "2024-01-14",
+            views: 89,
+            likes: 15,
+          },
+          {
+            id: 3,
+            title: "새로운 운동 기구 설치",
+            author: "박어르신",
+            date: "2024-01-13",
+            views: 234,
+            likes: 45,
+          },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPosts();
+    return () => unsubscribe();
+  }, []);
+
+  const handleWriteClick = () => {
+    if (!user) {
+      alert("글을 작성하려면 로그인이 필요합니다.");
+      navigate("/login");
+      return;
     }
-  ]);
-
-  const [selectedPost, setSelectedPost] = useState(null);
-
-  // /board/:id로 접근 시 해당 게시글 보여주기
-  const postById = id ? posts.find(post => post.id === Number(id)) : null;
-
-  const handlePostClick = (post) => {
-    setSelectedPost(post);
+    navigate("/board/write");
   };
 
-  const handleBackToList = () => {
-    setSelectedPost(null);
-    if (id) {
-      navigate("/board");
-    }
+  const handlePostClick = (postId) => {
+    navigate(`/board/${postId}`);
   };
 
-  if (postById || selectedPost) {
-    const post = postById || selectedPost;
+  const formatDate = (timestamp) => {
+    if (!timestamp) return "";
+    
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  };
+
+  const isLikedByUser = (post) => {
+    return user && post.likedBy && post.likedBy.includes(user.uid);
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
-        <div className="max-w-4xl mx-auto px-4 py-8 pb-20">
-          {/* 헤더 */}
-          <div className="flex items-center justify-between mb-6">
-            <button 
-              onClick={handleBackToList}
-              className="flex items-center text-amber-700 hover:text-amber-800 font-medium"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              목록으로 돌아가기
-            </button>
-            <h1 className="text-2xl font-bold text-gray-800">게시판</h1>
-          </div>
-
-          {/* 게시글 상세 */}
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <div className="border-b border-gray-200 pb-4 mb-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">{post.title}</h2>
-              <div className="flex items-center text-sm text-gray-600 space-x-4">
-                <span>작성자: {post.author}</span>
-                <span>작성일: {post.date}</span>
-                <span>조회수: {post.views}</span>
-                <span>좋아요: {post.likes}</span>
-              </div>
-            </div>
-            <div className="text-gray-700 leading-relaxed">
-              {post.content}
-            </div>
-            
-            {/* 댓글 섹션 */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">댓글</h3>
-              <div className="space-y-4">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-gray-800">이웃분1</span>
-                    <span className="text-sm text-gray-600">2024-01-15</span>
-                  </div>
-                  <p className="text-gray-700">정말 따뜻한 이야기네요! 저도 같은 생각입니다.</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-gray-800">이웃분2</span>
-                    <span className="text-sm text-gray-600">2024-01-15</span>
-                  </div>
-                  <p className="text-gray-700">우리 동네가 정말 좋은 곳이에요!</p>
-                </div>
-              </div>
-              
-              {/* 댓글 작성 */}
-              <div className="mt-6">
-                <textarea 
-                  className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  rows="3"
-                  placeholder="댓글을 작성해주세요..."
-                ></textarea>
-                <button className="mt-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg transition-colors duration-200">
-                  댓글 작성
-                </button>
-              </div>
-            </div>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-700 mx-auto mb-4"></div>
+          <p className="text-amber-700">게시글을 불러오는 중...</p>
         </div>
-        <BottomNavigation />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
-      <div className="max-w-4xl mx-auto px-4 py-8 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 pb-20">
+      <div className="max-w-4xl mx-auto p-6">
         {/* 헤더 */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">이웃 게시판</h1>
-          <button className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg transition-colors duration-200">
-            글쓰기
-          </button>
+        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+          <h1 className="text-3xl font-bold text-amber-700 mb-2 text-center">
+            자유게시판
+          </h1>
+          <p className="text-gray-600 text-center">
+            탑골공원 이야기를 자유롭게 나누어보세요
+          </p>
         </div>
 
         {/* 게시글 목록 */}
-        <div className="space-y-4">
-          {posts.map((post) => (
-            <div 
-              key={post.id}
-              onClick={() => handlePostClick(post)}
-              className="bg-white rounded-xl shadow-md p-6 cursor-pointer hover:shadow-lg transition-shadow duration-200"
+        <div className="bg-white rounded-2xl shadow-xl p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-gray-800">최신 게시글</h2>
+            <button 
+              onClick={handleWriteClick}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                user 
+                  ? "bg-amber-600 text-white hover:bg-amber-700" 
+                  : "bg-gray-400 text-white hover:bg-gray-500"
+              }`}
             >
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold text-gray-800 hover:text-amber-700 transition-colors duration-200">
-                  {post.title}
-                </h3>
-                <div className="flex items-center space-x-4 text-sm text-gray-600">
-                  <span>조회 {post.views}</span>
-                  <span>♥ {post.likes}</span>
-                </div>
+              {user ? "글쓰기" : "로그인 후 글쓰기"}
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {posts.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-gray-400 text-6xl mb-4">📝</div>
+                <p className="text-gray-600 text-lg mb-2">아직 게시글이 없습니다</p>
+                <p className="text-gray-500">첫 번째 게시글을 작성해보세요!</p>
               </div>
-              <p className="text-gray-600 mb-3 line-clamp-2">
-                {post.content}
-              </p>
-              <div className="flex items-center justify-between text-sm text-gray-500">
-                <span>작성자: {post.author}</span>
-                <span>{post.date}</span>
+            ) : (
+              posts.map((post) => (
+                <div
+                  key={post.id}
+                  onClick={() => handlePostClick(post.id)}
+                  className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <h3 className="text-lg font-semibold text-gray-800 hover:text-amber-700 transition-colors">
+                          {post.title}
+                        </h3>
+                        <span className="bg-amber-100 text-amber-800 px-2 py-1 rounded-full text-xs font-semibold">
+                          {post.category || "일반"}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-4 text-sm text-gray-600">
+                        <span>작성자: {post.author}</span>
+                        <span>작성일: {formatDate(post.createdAt)}</span>
+                        <span>조회수: {post.views || 0}</span>
+                        <div className="flex items-center space-x-1">
+                          <svg 
+                            className={`w-4 h-4 ${isLikedByUser(post) ? "text-red-500 fill-current" : "text-gray-400"}`} 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round" 
+                              strokeWidth={2} 
+                              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                            />
+                          </svg>
+                          <span className={isLikedByUser(post) ? "text-red-500 font-semibold" : ""}>
+                            {post.likes || 0}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="ml-4">
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* 페이지네이션 */}
+          {posts.length > 0 && (
+            <div className="flex justify-center mt-8">
+              <div className="flex space-x-2">
+                <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                  이전
+                </button>
+                <button className="px-3 py-2 bg-amber-600 text-white rounded-lg">
+                  1
+                </button>
+                <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                  2
+                </button>
+                <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                  3
+                </button>
+                <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                  다음
+                </button>
               </div>
             </div>
-          ))}
-        </div>
-
-        {/* 페이지네이션 */}
-        <div className="flex justify-center mt-8">
-          <div className="flex space-x-2">
-            <button className="px-3 py-2 text-gray-600 hover:text-amber-700">이전</button>
-            <button className="px-3 py-2 bg-amber-600 text-white rounded-lg">1</button>
-            <button className="px-3 py-2 text-gray-600 hover:text-amber-700">2</button>
-            <button className="px-3 py-2 text-gray-600 hover:text-amber-700">3</button>
-            <button className="px-3 py-2 text-gray-600 hover:text-amber-700">다음</button>
-          </div>
+          )}
         </div>
       </div>
-      <BottomNavigation />
     </div>
   );
 };

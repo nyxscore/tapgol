@@ -1,269 +1,261 @@
 // src/components/HealthBoard.jsx
-import React, { useState } from "react";
-import Header from "./Header";
-import BottomNavigation from "./BottomNavigation";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { auth } from "../util/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { getHealthPosts, toggleLike, incrementViews } from "../util/healthService";
 
 const HealthBoard = () => {
-  const [posts, setPosts] = useState([
-    {
-      id: 1,
-      title: "매일 30분 걷기의 건강 효과",
-      author: "건강관리자",
-      date: "2024-01-15",
-      content:
-        "매일 30분 걷기는 심혈관 질환 예방, 체중 관리, 스트레스 해소에 매우 효과적입니다. 특히 아침에 걷는 것이 가장 좋습니다.",
-      comments: [
-        {
-          id: 1,
-          author: "김철수",
-          content: "정말 도움이 되는 정보네요!",
-          date: "2024-01-15",
-        },
-        {
-          id: 2,
-          author: "이영희",
-          content: "저도 매일 걷고 있는데 확실히 건강이 좋아졌어요.",
-          date: "2024-01-16",
-        },
-      ],
-    },
-    {
-      id: 2,
-      title: "계절별 건강 관리 팁",
-      author: "의료진",
-      date: "2024-01-14",
-      content:
-        "봄철에는 알레르기 관리, 여름철에는 수분 섭취, 가을철에는 면역력 강화, 겨울철에는 감기 예방에 집중해야 합니다.",
-      comments: [
-        {
-          id: 3,
-          author: "박민수",
-          content: "계절별 관리법이 정말 중요하네요!",
-          date: "2024-01-14",
-        },
-      ],
-    },
-  ]);
+  const navigate = useNavigate();
+  const [posts, setPosts] = useState([]);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const [showWriteForm, setShowWriteForm] = useState(false);
-  const [selectedPost, setSelectedPost] = useState(null);
-  const [newPost, setNewPost] = useState({ title: "", content: "" });
-  const [newComment, setNewComment] = useState("");
+  useEffect(() => {
+    console.log("HealthBoard 컴포넌트 마운트");
+    
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      console.log("인증 상태 변경:", currentUser ? "로그인됨" : "로그아웃됨");
+      setUser(currentUser);
+      // 사용자 상태가 설정된 후 게시글 로드
+      loadHealthPosts();
+    });
 
-  const handleWritePost = () => {
-    if (newPost.title && newPost.content) {
-      const post = {
-        id: posts.length + 1,
-        title: newPost.title,
-        author: "사용자",
-        date: new Date().toISOString().split("T")[0],
-        content: newPost.content,
-        comments: [],
-      };
-      setPosts([post, ...posts]);
-      setNewPost({ title: "", content: "" });
-      setShowWriteForm(false);
+    return () => {
+      console.log("HealthBoard 컴포넌트 언마운트");
+      unsubscribe();
+    };
+  }, []);
+
+  const loadHealthPosts = async () => {
+    try {
+      console.log("loadHealthPosts 함수 시작");
+      setLoading(true);
+      setError(null);
+      const postsData = await getHealthPosts();
+      console.log("로드된 건강정보 게시글:", postsData);
+      setPosts(postsData);
+    } catch (error) {
+      console.error("건강정보 게시글 로드 오류:", error);
+      setError("게시글을 불러오는데 실패했습니다.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleAddComment = (postId) => {
-    if (newComment.trim()) {
-      const comment = {
-        id: Date.now(),
-        author: "사용자",
-        content: newComment,
-        date: new Date().toISOString().split("T")[0],
-      };
-
-      setPosts(
-        posts.map((post) =>
-          post.id === postId
-            ? { ...post, comments: [...post.comments, comment] }
-            : post
-        )
-      );
-      setNewComment("");
+  const handlePostClick = async (postId) => {
+    try {
+      // 조회수 증가 (로그인한 사용자만)
+      if (user) {
+        await incrementViews(postId);
+      }
+      navigate(`/health/${postId}`);
+    } catch (error) {
+      console.error("조회수 증가 오류:", error);
+      navigate(`/health/${postId}`);
     }
   };
 
-  const handlePostClick = (post) => {
-    setSelectedPost(post);
+  const handleWriteClick = () => {
+    if (!user) {
+      alert("글을 작성하려면 로그인이 필요합니다.");
+      navigate("/login");
+      return;
+    }
+    navigate("/health/write");
   };
 
-  const handleBackToList = () => {
-    setSelectedPost(null);
+  const handleLike = async (e, postId) => {
+    e.stopPropagation(); // 이벤트 버블링 방지
+    
+    if (!user) {
+      alert("좋아요를 누르려면 로그인이 필요합니다.");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const isLiked = await toggleLike(postId, user.uid);
+      
+      // 로컬 상태 업데이트
+      setPosts(prev => prev.map(post => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            likes: isLiked ? (post.likes || 0) + 1 : (post.likes || 0) - 1,
+            likedBy: isLiked 
+              ? [...(post.likedBy || []), user.uid]
+              : (post.likedBy || []).filter(uid => uid !== user.uid)
+          };
+        }
+        return post;
+      }));
+    } catch (error) {
+      console.error("좋아요 처리 오류:", error);
+      alert("좋아요 처리에 실패했습니다.");
+    }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-100">
-      <Header />
-      {/* 상세 보기 */}
-      {selectedPost ? (
-        <main className="pt-16 pb-20">
-          <div className="max-w-4xl mx-auto px-4 py-8">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex items-center justify-between mb-6">
-                <button
-                  onClick={handleBackToList}
-                  className="flex items-center text-blue-600 hover:text-blue-800"
-                >
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 19l-7-7 7-7"
-                    />
-                  </svg>
-                  목록으로 돌아가기
-                </button>
-              </div>
+  const formatDate = (timestamp) => {
+    if (!timestamp) return "";
+    
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  };
 
-              <div className="border-b pb-4 mb-6">
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                  {selectedPost.title}
-                </h1>
-                <div className="flex items-center text-sm text-gray-600">
-                  <span>{selectedPost.author}</span>
-                  <span className="mx-2">•</span>
-                  <span>{selectedPost.date}</span>
-                </div>
-              </div>
+  const isLikedByUser = (post) => {
+    return user && post.likedBy?.includes(user.uid);
+  };
 
-              <div className="prose max-w-none mb-8">
-                <p className="text-gray-700 leading-relaxed">
-                  {selectedPost.content}
-                </p>
-              </div>
+  const getCategoryColor = (category) => {
+    const colors = {
+      '일반': 'bg-gray-100 text-gray-800',
+      '운동': 'bg-blue-100 text-blue-800',
+      '영양': 'bg-green-100 text-green-800',
+      '질병예방': 'bg-red-100 text-red-800',
+      '정신건강': 'bg-purple-100 text-purple-800',
+      '노화관리': 'bg-orange-100 text-orange-800',
+      '기타': 'bg-yellow-100 text-yellow-800'
+    };
+    return colors[category] || colors['기타'];
+  };
 
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold mb-4">
-                  댓글 ({selectedPost.comments.length})
-                </h3>
+  console.log("HealthBoard 렌더링 - 상태:", { loading, error, postsCount: posts.length, user: !!user });
 
-                {selectedPost.comments.map((comment) => (
-                  <div
-                    key={comment.id}
-                    className="bg-gray-50 rounded-lg p-4 mb-4"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-gray-900">
-                        {comment.author}
-                      </span>
-                      <span className="text-sm text-gray-600">
-                        {comment.date}
-                      </span>
-                    </div>
-                    <p className="text-gray-700">{comment.content}</p>
-                  </div>
-                ))}
-
-                <div className="mt-6">
-                  <textarea
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    placeholder="댓글을 입력하세요..."
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    rows="3"
-                  />
-                  <button
-                    onClick={() => handleAddComment(selectedPost.id)}
-                    className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    댓글 작성
-                  </button>
-                </div>
-              </div>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
+        <main className="pb-20 pt-16">
+          <div className="max-w-4xl mx-auto px-4">
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-700 mx-auto mb-4"></div>
+              <p className="text-amber-700">건강정보를 불러오는 중...</p>
             </div>
           </div>
         </main>
-      ) : (
-        // 목록 보기
-        <main className="pt-16 pb-20">
-          <div className="max-w-4xl mx-auto px-4 py-8">
-            <div className="flex items-center justify-between mb-6">
-              <h1 className="text-3xl font-bold text-gray-900">
-                건강정보 게시판
-              </h1>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
+        <main className="pb-20 pt-16">
+          <div className="max-w-4xl mx-auto px-4">
+            <div className="text-center py-12">
+              <p className="text-red-600 text-lg mb-4">{error}</p>
               <button
-                onClick={() => setShowWriteForm(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                onClick={loadHealthPosts}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
               >
-                글쓰기
+                다시 시도
               </button>
             </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
-            {showWriteForm && (
-              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h2 className="text-xl font-semibold mb-4">새 글 작성</h2>
-                <div className="space-y-4">
-                  <input
-                    type="text"
-                    placeholder="제목을 입력하세요"
-                    value={newPost.title}
-                    onChange={(e) =>
-                      setNewPost({ ...newPost, title: e.target.value })
-                    }
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <textarea
-                    placeholder="내용을 입력하세요"
-                    value={newPost.content}
-                    onChange={(e) =>
-                      setNewPost({ ...newPost, content: e.target.value })
-                    }
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    rows="6"
-                  />
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={handleWritePost}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      작성하기
-                    </button>
-                    <button
-                      onClick={() => setShowWriteForm(false)}
-                      className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-                    >
-                      취소
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
+      <main className="pb-20 pt-16">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <h1 className="text-2xl font-bold text-gray-800">건강정보</h1>
+              <button
+                onClick={handleWriteClick}
+                className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center space-x-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>글쓰기</span>
+              </button>
+            </div>
+            <p className="text-gray-600">유용한 건강 정보를 공유하고 소통해보세요</p>
+          </div>
 
+          {posts.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-6xl mb-4">🏥</div>
+              <p className="text-gray-600 text-lg mb-2">아직 건강정보 게시글이 없습니다</p>
+              <p className="text-gray-500 mb-6">첫 번째 건강정보를 공유해보세요!</p>
+              <button
+                onClick={handleWriteClick}
+                className="bg-amber-600 text-white px-6 py-3 rounded-lg hover:bg-amber-700 transition-colors"
+              >
+                건강정보 작성하기
+              </button>
+            </div>
+          ) : (
             <div className="space-y-4">
               {posts.map((post) => (
                 <div
                   key={post.id}
+                  onClick={() => handlePostClick(post.id)}
                   className="bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-shadow"
-                  onClick={() => handlePostClick(post)}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-xl font-semibold text-gray-900">
-                      {post.title}
-                    </h2>
-                    <span className="text-sm text-gray-600">{post.date}</span>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-3">
+                      <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getCategoryColor(post.category)}`}>
+                        {post.category}
+                      </span>
+                      <span className="text-sm text-gray-500">{formatDate(post.createdAt)}</span>
+                    </div>
+                    <div className="flex items-center space-x-4 text-sm text-gray-500">
+                      <div className="flex items-center space-x-1">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                          <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                        </svg>
+                        <span>{post.views || 0}</span>
+                      </div>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                    </div>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600 mb-3">
-                    <span>{post.author}</span>
-                    <span className="mx-2">•</span>
-                    <span>댓글 {post.comments.length}개</span>
+                  
+                  <h2 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2">
+                    {post.title}
+                  </h2>
+                  
+                  <p className="text-gray-700 mb-4 line-clamp-3">
+                    {post.content}
+                  </p>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-gray-800">{post.author}</span>
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={(e) => handleLike(e, post.id)}
+                        className={`flex items-center space-x-1 transition-colors ${
+                          isLikedByUser(post) ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
+                        }`}
+                      >
+                        <svg className="w-4 h-4" fill={isLikedByUser(post) ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                        </svg>
+                        <span>{post.likes || 0}</span>
+                      </button>
+                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
                   </div>
-                  <p className="text-gray-700 line-clamp-2">{post.content}</p>
                 </div>
               ))}
             </div>
-          </div>
-        </main>
-      )}
-      <BottomNavigation /> {/* 항상 하단에 고정 렌더 */}
+          )}
+        </div>
+      </main>
     </div>
   );
 };

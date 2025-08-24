@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { auth, db } from "../util/firebase";
-import { updateProfile } from "firebase/auth";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { auth } from "../util/firebase";
+import { updateProfile, onAuthStateChanged } from "firebase/auth";
 import { signOut } from "firebase/auth";
+import { getUserProfile, updateUserProfile } from "../util/userService";
 
 const Profile = () => {
   const [user, setUser] = useState(null);
@@ -14,43 +14,61 @@ const Profile = () => {
   const [success, setSuccess] = useState("");
   const navigate = useNavigate();
 
+  const interests = [
+    "탁구", "바둑", "장기", "고스톱", "노래방", "운동", "독서", "게임", "음악", "영화"
+  ];
+
   const [form, setForm] = useState({
     name: "",
     nickname: "",
     phone: "",
+    birthDate: "",
+    gender: "",
+    address: "",
+    interests: []
   });
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        setUser(currentUser);
-        
-        // Firestore에서 추가 사용자 정보 가져오기
+        // 사용자 객체가 유효한지 확인
         try {
-          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-          if (userDoc.exists()) {
-            const data = userDoc.data();
-            setUserData(data);
+          // getIdToken을 호출하여 사용자 객체가 유효한지 테스트
+          await currentUser.getIdToken(true);
+          setUser(currentUser);
+          
+          // Firestore에서 추가 사용자 정보 가져오기
+          try {
+            const userProfile = await getUserProfile(currentUser.uid);
+            setUserData(userProfile);
             setForm({
-              name: data.name || currentUser.displayName || "",
-              nickname: data.nickname || "",
-              phone: data.phone || "",
+              name: userProfile.name || currentUser.displayName || "",
+              nickname: userProfile.nickname || "",
+              phone: userProfile.phone || "",
+              birthDate: userProfile.birthDate || "",
+              gender: userProfile.gender || "",
+              address: userProfile.address || "",
+              interests: userProfile.interests || []
             });
-          } else {
-            // Firestore에 데이터가 없으면 기본값 설정
+          } catch (error) {
+            console.error("사용자 정보 로드 오류:", error);
             setForm({
               name: currentUser.displayName || "",
               nickname: "",
               phone: "",
+              birthDate: "",
+              gender: "",
+              address: "",
+              interests: []
             });
           }
-        } catch (error) {
-          console.error("사용자 정보 로드 오류:", error);
-          setForm({
-            name: currentUser.displayName || "",
-            nickname: "",
-            phone: "",
-          });
+        } catch (authError) {
+          console.error("사용자 인증 오류:", authError);
+          setError("사용자 인증에 문제가 있습니다. 다시 로그인해주세요.");
+          // 인증에 문제가 있으면 로그아웃 처리
+          await signOut(auth);
+          navigate("/login");
+          return;
         }
       } else {
         // 로그인되지 않은 경우 로그인 페이지로 이동
@@ -63,7 +81,24 @@ const Profile = () => {
   }, [navigate]);
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value, type } = e.target;
+    
+    if (type === 'checkbox') {
+      const checked = e.target.checked;
+      if (checked) {
+        setForm({ 
+          ...form, 
+          interests: [...form.interests, value]
+        });
+      } else {
+        setForm({ 
+          ...form, 
+          interests: form.interests.filter(interest => interest !== value)
+        });
+      }
+    } else {
+      setForm({ ...form, [name]: value });
+    }
   };
 
   const handleEdit = () => {
@@ -79,6 +114,10 @@ const Profile = () => {
       name: userData?.name || user?.displayName || "",
       nickname: userData?.nickname || "",
       phone: userData?.phone || "",
+      birthDate: userData?.birthDate || "",
+      gender: userData?.gender || "",
+      address: userData?.address || "",
+      interests: userData?.interests || []
     });
     setError("");
     setSuccess("");
@@ -90,33 +129,80 @@ const Profile = () => {
     setSuccess("");
 
     try {
-      // Firebase Auth 프로필 업데이트
-      await updateProfile(user, {
-        displayName: form.name,
-      });
+      // 현재 사용자 상태 재확인
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error("사용자가 로그인되지 않았습니다.");
+      }
+
+      // 사용자 객체 유효성 재확인
+      try {
+        await currentUser.getIdToken(true);
+      } catch (authError) {
+        throw new Error("사용자 인증이 만료되었습니다. 다시 로그인해주세요.");
+      }
+
+      // Firebase Auth 프로필 업데이트 (선택적)
+      if (form.name !== currentUser.displayName) {
+        try {
+          await updateProfile(currentUser, {
+            displayName: form.name,
+          });
+        } catch (profileError) {
+          console.warn("프로필 업데이트 실패:", profileError);
+          // 프로필 업데이트가 실패해도 Firestore 업데이트는 계속 진행
+        }
+      }
 
       // Firestore 사용자 정보 업데이트
-      await updateDoc(doc(db, "users", user.uid), {
+      await updateUserProfile(currentUser.uid, {
         name: form.name,
         nickname: form.nickname,
         phone: form.phone,
-        updatedAt: new Date(),
+        birthDate: form.birthDate,
+        gender: form.gender,
+        address: form.address,
+        interests: form.interests,
+        profileComplete: true
       });
 
       setSuccess("회원정보가 성공적으로 수정되었습니다!");
       setEditing(false);
       
       // 사용자 상태 업데이트
-      setUser({ ...user, displayName: form.name });
+      setUser({ ...currentUser, displayName: form.name });
       setUserData({
         ...userData,
         name: form.name,
         nickname: form.nickname,
         phone: form.phone,
+        birthDate: form.birthDate,
+        gender: form.gender,
+        address: form.address,
+        interests: form.interests,
+        profileComplete: true
       });
     } catch (error) {
       console.error("회원정보 수정 오류:", error);
-      setError("회원정보 수정 중 오류가 발생했습니다.");
+      
+      // 사용자 친화적인 오류 메시지
+      let errorMessage = "회원정보 수정 중 오류가 발생했습니다.";
+      
+      if (error.message.includes("인증이 만료")) {
+        errorMessage = "로그인 세션이 만료되었습니다. 다시 로그인해주세요.";
+        // 자동으로 로그인 페이지로 이동
+        setTimeout(() => {
+          signOut(auth);
+          navigate("/login");
+        }, 2000);
+      } else if (error.message.includes("로그인되지 않았습니다")) {
+        errorMessage = "로그인이 필요합니다.";
+        navigate("/login");
+      } else {
+        errorMessage += " " + error.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -149,7 +235,7 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 pb-20">
-      <div className="max-w-2xl mx-auto p-6">
+      <div className="max-w-4xl mx-auto p-6">
         {/* 헤더 */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
           <h1 className="text-3xl font-bold text-amber-700 mb-2 text-center">
@@ -184,14 +270,20 @@ const Profile = () => {
                 {user.displayName || "사용자"}
               </h2>
               <p className="text-gray-600">{user.email}</p>
+              <p className="text-sm text-gray-500">
+                가입일: {user.metadata?.creationTime 
+                  ? new Date(user.metadata.creationTime).toLocaleDateString('ko-KR')
+                  : "알 수 없음"
+                }
+              </p>
             </div>
           </div>
 
-          {/* 정보 폼 */}
-          <div className="space-y-4">
+          {/* 기본 정보 섹션 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                이름
+                이름 *
               </label>
               {editing ? (
                 <input
@@ -209,7 +301,7 @@ const Profile = () => {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                별명
+                별명 *
               </label>
               {editing ? (
                 <input
@@ -227,7 +319,7 @@ const Profile = () => {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                전화번호
+                전화번호 *
               </label>
               {editing ? (
                 <input
@@ -245,15 +337,104 @@ const Profile = () => {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                가입일
+                생년월일
               </label>
-              <p className="text-gray-800 py-3">
-                {user.metadata?.creationTime 
-                  ? new Date(user.metadata.creationTime).toLocaleDateString('ko-KR')
-                  : "알 수 없음"
-                }
-              </p>
+              {editing ? (
+                <input
+                  type="date"
+                  name="birthDate"
+                  value={form.birthDate}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+              ) : (
+                <p className="text-gray-800 py-3">
+                  {form.birthDate ? new Date(form.birthDate).toLocaleDateString('ko-KR') : "미설정"}
+                </p>
+              )}
             </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                성별
+              </label>
+              {editing ? (
+                <select
+                  name="gender"
+                  value={form.gender}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                >
+                  <option value="">선택하세요</option>
+                  <option value="male">남성</option>
+                  <option value="female">여성</option>
+                  <option value="other">기타</option>
+                </select>
+              ) : (
+                <p className="text-gray-800 py-3">
+                  {form.gender === 'male' ? '남성' : 
+                   form.gender === 'female' ? '여성' : 
+                   form.gender === 'other' ? '기타' : '미설정'}
+                </p>
+              )}
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                주소
+              </label>
+              {editing ? (
+                <input
+                  type="text"
+                  name="address"
+                  value={form.address}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  placeholder="서울시 종로구 탑골공원"
+                />
+              ) : (
+                <p className="text-gray-800 py-3">{form.address || "미설정"}</p>
+              )}
+            </div>
+          </div>
+
+          {/* 관심사 섹션 */}
+          <div className="border-t pt-6">
+            <label className="block text-sm font-semibold text-gray-700 mb-4">
+              관심사
+            </label>
+            {editing ? (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {interests.map((interest) => (
+                  <label key={interest} className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="interests"
+                      value={interest}
+                      checked={form.interests.includes(interest)}
+                      onChange={handleChange}
+                      className="w-4 h-4 text-amber-600 border-amber-300 rounded focus:ring-amber-500"
+                    />
+                    <span className="text-sm">{interest}</span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {form.interests.length > 0 ? (
+                  form.interests.map((interest) => (
+                    <span
+                      key={interest}
+                      className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm"
+                    >
+                      {interest}
+                    </span>
+                  ))
+                ) : (
+                  <p className="text-gray-500">관심사가 설정되지 않았습니다.</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
