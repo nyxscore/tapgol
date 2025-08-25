@@ -8,6 +8,7 @@ import {
   updateComment, 
   deleteComment 
 } from "../util/commentService";
+import { formatTextWithLinks } from "../util/textUtils.jsx";
 
 const CommentSection = ({ postId, boardType = "board" }) => {
   const [comments, setComments] = useState([]);
@@ -337,7 +338,7 @@ const CommentSection = ({ postId, boardType = "board" }) => {
                     )}
                   </div>
                   <div className="text-gray-700 whitespace-pre-wrap">
-                    {comment.content}
+                    {formatTextWithLinks(comment.content)}
                   </div>
                 </div>
               )}

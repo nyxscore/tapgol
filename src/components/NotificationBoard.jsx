@@ -7,6 +7,7 @@ import {
   subscribeToNotifications, 
   getNotification,
   markNotificationAsRead,
+  markAllNotificationsAsRead,
   createNotification,
   updateNotification,
   deleteNotification
@@ -140,6 +141,31 @@ const NotificationBoard = () => {
     }
   };
 
+  const handleMarkAllAsRead = async () => {
+    if (!user) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+    
+    const unreadCount = notifications.filter(n => !n.isRead).length;
+    if (unreadCount === 0) {
+      alert("읽지 않은 알림이 없습니다.");
+      return;
+    }
+    
+    if (!window.confirm(`모든 알림(${unreadCount}개)을 읽음 처리하시겠습니까?`)) {
+      return;
+    }
+    
+    try {
+      const processedCount = await markAllNotificationsAsRead();
+      alert(`${processedCount}개의 알림이 읽음 처리되었습니다.`);
+    } catch (error) {
+      console.error("모든 알림 읽음 처리 오류:", error);
+      alert("알림 읽음 처리에 실패했습니다.");
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -257,7 +283,17 @@ const NotificationBoard = () => {
 
           {/* 알림 목록 */}
           <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">최근 알림</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">최근 알림</h2>
+              {notifications.filter(n => !n.isRead).length > 0 && (
+                <button
+                  onClick={handleMarkAllAsRead}
+                  className="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  모두 읽음
+                </button>
+              )}
+            </div>
             
             {notifications.length === 0 ? (
               <div className="text-center py-8">

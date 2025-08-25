@@ -4,6 +4,8 @@ import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getKaraokePost, incrementViews, toggleLike, deleteKaraokePost } from "../util/karaokeService";
 import { formatFileSize } from "../util/karaokeService";
+import { markNotificationsByPostIdAsRead } from "../util/notificationService";
+import { formatTextWithLinks } from "../util/textUtils.jsx";
 import CommentSection from "./CommentSection";
 
 const KaraokeDetail = () => {
@@ -57,6 +59,17 @@ const KaraokeDetail = () => {
       if (user) {
         await incrementViews(id);
         setPost(prev => ({ ...prev, views: (prev?.views || 0) + 1 }));
+        
+        // 이 노래방 게시글과 관련된 알림을 읽음 처리
+        try {
+          const processedCount = await markNotificationsByPostIdAsRead(id, "karaoke");
+          if (processedCount > 0) {
+            console.log(`${processedCount}개의 노래방 관련 알림이 읽음 처리되었습니다.`);
+          }
+        } catch (notificationError) {
+          console.error("알림 읽음 처리 오류:", notificationError);
+          // 알림 처리 실패는 게시글 보기에 영향을 주지 않도록 함
+        }
       }
       
       // 좋아요 상태 확인
@@ -218,7 +231,9 @@ const KaraokeDetail = () => {
                   <span>조회 {post.views || 0}</span>
                 </div>
                 {post.description && (
-                  <p className="text-gray-700 whitespace-pre-wrap">{post.description}</p>
+                  <div className="text-gray-700 whitespace-pre-wrap">
+                    {formatTextWithLinks(post.description)}
+                  </div>
                 )}
               </div>
               

@@ -8,6 +8,7 @@ import {
   updateGalleryComment, 
   deleteGalleryComment 
 } from "../util/galleryCommentService";
+import { formatTextWithLinks } from "../util/textUtils.jsx";
 
 const GalleryCommentSection = ({ galleryId }) => {
   const [comments, setComments] = useState([]);
@@ -276,7 +277,7 @@ const GalleryCommentSection = ({ galleryId }) => {
                     )}
                   </div>
                   <div className="text-gray-700 whitespace-pre-wrap">
-                    {comment.content}
+                    {formatTextWithLinks(comment.content)}
                   </div>
                 </div>
               )}

@@ -37,6 +37,8 @@ import JanggiGame from "./components/games/JanggiGame";
 import GostopGame from "./components/games/GostopGame";
 import YutnoriGame from "./components/games/YutnoriGame";
 import TetrisGame from "./components/games/TetrisGame";
+import AlumniSearch from "./components/AlumniSearch";
+import AlumniResults from "./components/AlumniResults";
 
 // 메인 레이아웃 컴포넌트
 function MainLayout() {
@@ -89,10 +91,12 @@ export default function App() {
               <Route path="/gostop-game" element={<GostopGame />} />
               <Route path="/yutnori-game" element={<YutnoriGame />} />
               <Route path="/tetris-game" element={<TetrisGame />} />
+              <Route path="/alumni-search" element={<AlumniSearch />} />
+              <Route path="/alumni-results" element={<AlumniResults />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/profile" element={<Profile />} />
             </Route>
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/profile" element={<Profile />} />
           </Routes>
         </Router>
       </NotificationsProvider>

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Header from './Header';
-import BottomNavigation from './BottomNavigation';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../util/firebase';
+import { searchAlumniWithAI } from '../util/alumniSearchService';
 
 const AlumniSearch = () => {
   const navigate = useNavigate();
@@ -22,12 +23,27 @@ const AlumniSearch = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (formData.schoolName && formData.graduationYear && formData.age) {
-      // 검색 결과 페이지로 이동하면서 데이터 전달
-      navigate('/alumni-results', { 
-        state: { searchData: formData }
-      });
-    }
+    if (!(formData.schoolName && formData.graduationYear && formData.age)) return;
+
+    // 현재 로그인 사용자 정보 가져오기 후 AI 검색 호출
+    onAuthStateChanged(auth, async (currentUser) => {
+      try {
+        const ai = await searchAlumniWithAI({
+          schoolName: formData.schoolName,
+          graduationYear: formData.graduationYear,
+          age: formData.age,
+          additionalInfo: formData.additionalInfo,
+          user: currentUser || null,
+        });
+
+        navigate('/alumni-results', {
+          state: { searchData: formData, aiResults: ai?.results || [], aiMeta: ai?.meta || null },
+        });
+      } catch (err) {
+        console.error('AI 동창 검색 오류:', err);
+        navigate('/alumni-results', { state: { searchData: formData, aiResults: [], aiMeta: { source: 'client-error' } } });
+      }
+    });
   };
 
   const currentYear = new Date().getFullYear();
@@ -35,8 +51,7 @@ const AlumniSearch = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
-      <Header />
-      <main className="pb-20 pt-16">
+      <main className="pt-16">
         <div className="max-w-4xl mx-auto px-4">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-800 mb-2">동창찾기</h1>
@@ -137,29 +152,10 @@ const AlumniSearch = () => {
               </ul>
             </div>
 
-            {/* 지원하는 소셜 네트워크 */}
-            <div className="mt-6">
-              <h3 className="font-semibold text-gray-800 mb-3">검색 대상 소셜 네트워크</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {[
-                  { name: 'Instagram', icon: '📷', color: 'bg-gradient-to-r from-purple-500 to-pink-500' },
-                  { name: 'Telegram', icon: '✈️', color: 'bg-gradient-to-r from-blue-500 to-blue-600' },
-                  { name: 'KakaoTalk', icon: '💬', color: 'bg-gradient-to-r from-yellow-400 to-yellow-500' },
-                  { name: 'Naver Band', icon: '🎵', color: 'bg-gradient-to-r from-green-500 to-green-600' },
-                  { name: 'YouTube', icon: '📺', color: 'bg-gradient-to-r from-red-500 to-red-600' },
-                  { name: 'TikTok', icon: '🎵', color: 'bg-gradient-to-r from-pink-500 to-purple-500' }
-                ].map((platform, index) => (
-                  <div key={index} className={`${platform.color} text-white p-3 rounded-lg text-center`}>
-                    <div className="text-lg mb-1">{platform.icon}</div>
-                    <div className="text-xs font-medium">{platform.name}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            
           </div>
         </div>
       </main>
-      <BottomNavigation />
     </div>
   );
 };

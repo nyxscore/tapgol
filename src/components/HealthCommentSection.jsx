@@ -8,6 +8,7 @@ import {
   updateHealthComment, 
   deleteHealthComment 
 } from "../util/healthCommentService";
+import { formatTextWithLinks } from "../util/textUtils.jsx";
 
 const HealthCommentSection = ({ postId }) => {
   const [comments, setComments] = useState([]);
@@ -276,7 +277,7 @@ const HealthCommentSection = ({ postId }) => {
                     )}
                   </div>
                   <div className="text-gray-700 whitespace-pre-wrap">
-                    {comment.content}
+                    {formatTextWithLinks(comment.content)}
                   </div>
                 </div>
               )}

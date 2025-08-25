@@ -1,7 +1,8 @@
 import {
   collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc,
-  query, where, orderBy, limit, serverTimestamp, onSnapshot, increment
+  query, where, orderBy, limit, serverTimestamp, onSnapshot, increment, writeBatch
 } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 import { db } from "./firebase";
 
 // 알림 작성 (관리자용)
@@ -197,6 +198,16 @@ export const getNotificationsByCategory = async (category, limitCount = 10) => {
 // 채팅 알림 생성
 export const createChatNotification = async (chatData) => {
   try {
+    // 자신이 보낸 메시지에 대해서는 알림을 생성하지 않음
+    // 현재 로그인한 사용자 정보를 가져와서 비교
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+    
+    if (currentUser && chatData.authorId === currentUser.uid) {
+      console.log("자신이 보낸 메시지이므로 알림을 생성하지 않습니다.");
+      return null;
+    }
+    
     const notificationData = {
       title: "새로운 채팅 메시지",
       content: `${chatData.author}님이 메시지를 보냈습니다: ${chatData.content.substring(0, 50)}${chatData.content.length > 50 ? '...' : ''}`,
@@ -305,5 +316,102 @@ export const subscribeToUnreadChatCount = (callback) => {
   } catch (error) {
     console.error("읽지 않은 채팅 알림 개수 구독 오류:", error);
     throw new Error("읽지 않은 채팅 알림 개수를 불러오는데 실패했습니다.");
+  }
+};
+
+// 모든 알림을 읽음 처리
+export const markAllNotificationsAsRead = async () => {
+  try {
+    const q = query(
+      collection(db, "notifications"),
+      where("isRead", "==", false)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const batch = writeBatch(db);
+    
+    querySnapshot.forEach((snapshotDoc) => {
+      const notificationRef = doc(db, "notifications", snapshotDoc.id);
+      batch.update(notificationRef, {
+        isRead: true,
+        readCount: increment(1),
+        updatedAt: serverTimestamp()
+      });
+    });
+    
+    await batch.commit();
+    return querySnapshot.size; // 읽음 처리된 알림 개수 반환
+  } catch (error) {
+    console.error("모든 알림 읽음 처리 오류:", error);
+    throw new Error("모든 알림 읽음 처리에 실패했습니다.");
+  }
+};
+
+// 특정 게시글과 관련된 알림을 읽음 처리
+export const markNotificationsByPostIdAsRead = async (postId, postType = "board") => {
+  try {
+    const q = query(
+      collection(db, "notifications"),
+      where("isRead", "==", false),
+      where("relatedPostId", "==", postId),
+      where("postType", "==", postType)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) {
+      return 0; // 관련 알림이 없음
+    }
+    
+    const batch = writeBatch(db);
+    
+    querySnapshot.forEach((snapshotDoc) => {
+      const notificationRef = doc(db, "notifications", snapshotDoc.id);
+      batch.update(notificationRef, {
+        isRead: true,
+        readCount: increment(1),
+        updatedAt: serverTimestamp()
+      });
+    });
+    
+    await batch.commit();
+    return querySnapshot.size; // 읽음 처리된 알림 개수 반환
+  } catch (error) {
+    console.error("게시글 관련 알림 읽음 처리 오류:", error);
+    // 에러가 발생해도 게시글 보기는 계속 진행되도록 에러를 던지지 않음
+    return 0;
+  }
+};
+
+// 채팅 관련 알림을 읽음 처리
+export const markChatNotificationsAsRead = async () => {
+  try {
+    const q = query(
+      collection(db, "notifications"),
+      where("isRead", "==", false),
+      where("category", "==", "chat")
+    );
+    
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) {
+      return 0; // 채팅 관련 알림이 없음
+    }
+    
+    const batch = writeBatch(db);
+    
+    querySnapshot.forEach((snapshotDoc) => {
+      const notificationRef = doc(db, "notifications", snapshotDoc.id);
+      batch.update(notificationRef, {
+        isRead: true,
+        readCount: increment(1),
+        updatedAt: serverTimestamp()
+      });
+    });
+    
+    await batch.commit();
+    return querySnapshot.size; // 읽음 처리된 알림 개수 반환
+  } catch (error) {
+    console.error("채팅 알림 읽음 처리 오류:", error);
+    // 에러가 발생해도 채팅은 계속 진행되도록 에러를 던지지 않음
+    return 0;
   }
 };

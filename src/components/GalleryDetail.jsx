@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getGalleryItem, incrementViews, deleteGalleryItem, toggleLike } from "../util/galleryService";
+import { markNotificationsByPostIdAsRead } from "../util/notificationService";
+import { formatTextWithLinks } from "../util/textUtils.jsx";
 import CommentSection from "./CommentSection";
 
 const GalleryDetail = () => {
@@ -27,6 +29,17 @@ const GalleryDetail = () => {
         // 조회수 증가 (로그인한 사용자만)
         if (user) {
           await incrementViews(id);
+          
+          // 이 갤러리 항목과 관련된 알림을 읽음 처리
+          try {
+            const processedCount = await markNotificationsByPostIdAsRead(id, "gallery");
+            if (processedCount > 0) {
+              console.log(`${processedCount}개의 갤러리 관련 알림이 읽음 처리되었습니다.`);
+            }
+          } catch (notificationError) {
+            console.error("알림 읽음 처리 오류:", notificationError);
+            // 알림 처리 실패는 갤러리 보기에 영향을 주지 않도록 함
+          }
         }
       } catch (error) {
         console.error("갤러리 항목 로드 오류:", error);
@@ -260,7 +273,9 @@ const GalleryDetail = () => {
             <div className="mb-8">
               <h3 className="text-lg font-semibold text-gray-800 mb-3">설명</h3>
               <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-gray-700 whitespace-pre-wrap">{item.description}</p>
+                <div className="text-gray-700 whitespace-pre-wrap">
+                  {formatTextWithLinks(item.description)}
+                </div>
               </div>
             </div>
           )}

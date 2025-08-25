@@ -9,9 +9,17 @@ import {
   query, 
   where, 
   onSnapshot, 
-  serverTimestamp
+  serverTimestamp,
+  deleteDoc,
+  doc
 } from "firebase/firestore";
 import { db } from "../util/firebase";
+import {
+  addOnlineUser,
+  removeOnlineUser,
+  subscribeToOnlineUsers
+} from "../util/onlineUsersService";
+import { formatTextWithLinks } from "../util/textUtils.jsx";
 
 const ParkChat = () => {
   const { parkId: parkIdParam } = useParams();
@@ -22,7 +30,9 @@ const ParkChat = () => {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState([]);
   const messagesEndRef = useRef(null);
+  const currentOnlineUserRef = useRef(null);
 
   // parkId를 문자열로 변환
   const parkId = String(parkIdParam);
@@ -47,6 +57,16 @@ const ParkChat = () => {
         try {
           const profile = await getUserProfile(currentUser.uid);
           setUserData(profile);
+          
+          // 접속자 목록에 추가
+          const onlineUserData = {
+            authorId: currentUser.uid,
+            author: profile?.nickname || profile?.name || currentUser.displayName || "익명",
+            authorEmail: currentUser.email
+          };
+          
+          const onlineUser = await addOnlineUser(onlineUserData);
+          currentOnlineUserRef.current = onlineUser;
         } catch (error) {
           console.error('사용자 정보 로드 오류:', error);
           setUserData({
@@ -100,6 +120,50 @@ const ParkChat = () => {
     return () => unsubscribe();
   }, [parkId, user]);
 
+  // 실시간 접속자 목록 구독
+  useEffect(() => {
+    if (!user) return;
+
+    try {
+      const unsubscribe = subscribeToOnlineUsers((users) => {
+        setOnlineUsers(users);
+      });
+
+      return () => unsubscribe();
+    } catch (error) {
+      console.error("접속자 목록 구독 오류:", error);
+    }
+  }, [user]);
+
+  // 페이지를 벗어날 때 접속자 목록에서 제거
+  useEffect(() => {
+    const handleBeforeUnload = async () => {
+      if (currentOnlineUserRef.current) {
+        try {
+          await removeOnlineUser(currentOnlineUserRef.current.id);
+        } catch (error) {
+          console.error("접속자 제거 오류:", error);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
+  // 컴포넌트 언마운트 시 접속자 제거
+  useEffect(() => {
+    return () => {
+      if (currentOnlineUserRef.current) {
+        removeOnlineUser(currentOnlineUserRef.current.id).catch(error => {
+          console.error("컴포넌트 언마운트 시 접속자 제거 오류:", error);
+        });
+      }
+    };
+  }, []);
+
   // 메시지 전송
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -123,6 +187,20 @@ const ParkChat = () => {
       alert('메시지 전송에 실패했습니다.');
     } finally {
       setSending(false);
+    }
+  };
+
+  // 메시지 삭제
+  const handleDeleteMessage = async (messageId) => {
+    if (!window.confirm("정말로 이 메시지를 삭제하시겠습니까?")) {
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, "parkChats", messageId));
+    } catch (error) {
+      console.error('메시지 삭제 오류:', error);
+      alert('메시지 삭제에 실패했습니다.');
     }
   };
 
@@ -189,10 +267,11 @@ const ParkChat = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <div>
-                <h1 className="text-lg font-semibold text-gray-800">{currentPark.name}</h1>
-                <p className="text-sm text-gray-600">{currentPark.location} • 공원별 채팅방</p>
-              </div>
+                             <div>
+                 <h1 className="text-lg font-semibold text-gray-800">{currentPark.name}</h1>
+                 <p className="text-sm text-gray-600">{currentPark.location} • 공원별 채팅방</p>
+                 <p className="text-xs text-gray-500">접속자: {onlineUsers.length}명</p>
+               </div>
             </div>
             <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
               <span className="text-amber-600 text-sm font-semibold">
@@ -215,30 +294,62 @@ const ParkChat = () => {
               <p className="text-sm">아래 입력창에 메시지를 입력하고 전송해보세요.</p>
             </div>
           ) : (
-            messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.authorId === user?.uid ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                    message.authorId === user?.uid
-                      ? 'bg-amber-600 text-white'
-                      : 'bg-white text-gray-800 shadow-sm'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium opacity-75">
-                      {message.author}
-                    </span>
-                    <span className="text-xs opacity-75">
-                      {formatTime(message.createdAt)}
-                    </span>
-                  </div>
-                  <p className="text-sm">{message.content}</p>
-                </div>
-              </div>
-            ))
+                         messages.map((message) => {
+               const isMyMessage = message.authorId === user?.uid;
+               return (
+                 <div
+                   key={message.id}
+                   className={`flex ${isMyMessage ? 'justify-start' : 'justify-end'} mb-3`}
+                 >
+                   {isMyMessage && (
+                     <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 mr-2">
+                       {userData?.nickname?.[0] || userData?.name?.[0] || user.displayName?.[0] || "나"}
+                     </div>
+                   )}
+                   <div className={`max-w-xs lg:max-w-md ${isMyMessage ? 'order-1' : 'order-2'}`}>
+                     {isMyMessage && (
+                       <div className="flex items-center space-x-2 mb-1">
+                         <span className="font-medium text-gray-800 text-sm">{message.author}</span>
+                         <span className="text-xs text-gray-500">{formatTime(message.createdAt)}</span>
+                       </div>
+                     )}
+                                           <div
+                        className={`rounded-2xl px-4 py-2 ${
+                          isMyMessage 
+                            ? 'bg-amber-500 text-white rounded-bl-md' 
+                            : 'bg-gray-200 text-gray-800 rounded-br-md'
+                        }`}
+                      >
+                        <div className="whitespace-pre-wrap break-words text-sm">
+                          {formatTextWithLinks(message.content)}
+                        </div>
+                      </div>
+                                           {!isMyMessage && (
+                        <div className="flex items-center justify-start space-x-1 mt-1">
+                          <span className="text-xs text-gray-500">{formatTime(message.createdAt)}</span>
+                          <span className="text-xs text-gray-400">• {message.author}</span>
+                        </div>
+                      )}
+                      {isMyMessage && (
+                        <div className="flex items-center justify-start space-x-1 mt-1">
+                          <span className="text-xs text-gray-500">{formatTime(message.createdAt)}</span>
+                          <button
+                            onClick={() => handleDeleteMessage(message.id)}
+                            className="text-xs text-red-600 hover:text-red-800 transition-colors"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      )}
+                   </div>
+                   {!isMyMessage && (
+                     <div className="w-8 h-8 bg-amber-600 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 ml-2">
+                       {message.author?.[0] || "익"}
+                     </div>
+                   )}
+                 </div>
+               );
+             })
           )}
           <div ref={messagesEndRef} />
         </div>

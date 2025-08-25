@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getPost, incrementViews, deletePost, toggleLike } from "../util/postService";
+import { markNotificationsByPostIdAsRead } from "../util/notificationService";
+import { formatTextWithLinks } from "../util/textUtils.jsx";
 import CommentSection from "./CommentSection";
 
 const BoardDetail = () => {
@@ -27,6 +29,17 @@ const BoardDetail = () => {
         // 조회수 증가 (로그인한 사용자만)
         if (user) {
           await incrementViews(id);
+          
+          // 이 게시글과 관련된 알림을 읽음 처리
+          try {
+            const processedCount = await markNotificationsByPostIdAsRead(id, "board");
+            if (processedCount > 0) {
+              console.log(`${processedCount}개의 게시글 관련 알림이 읽음 처리되었습니다.`);
+            }
+          } catch (notificationError) {
+            console.error("알림 읽음 처리 오류:", notificationError);
+            // 알림 처리 실패는 게시글 보기에 영향을 주지 않도록 함
+          }
         }
       } catch (error) {
         console.error("게시글 로드 오류:", error);
@@ -229,7 +242,7 @@ const BoardDetail = () => {
           <div className="mb-8">
             <div className="prose max-w-none">
               <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
-                {post.content}
+                {formatTextWithLinks(post.content)}
               </div>
             </div>
           </div>

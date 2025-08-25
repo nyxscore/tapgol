@@ -7,6 +7,19 @@ import { db } from "./firebase";
 // 사용자 접속 상태 추가
 export const addOnlineUser = async (userData) => {
   try {
+    // 기존에 같은 사용자가 접속해 있는지 확인
+    const existingUser = await getOnlineUser(userData.authorId);
+    
+    if (existingUser) {
+      // 기존 사용자가 있으면 업데이트
+      await updateOnlineUser(existingUser.id, {
+        lastSeen: serverTimestamp(),
+        isOnline: true
+      });
+      return existingUser;
+    }
+    
+    // 새로운 사용자 추가
     const onlineUserData = {
       ...userData,
       lastSeen: serverTimestamp(),

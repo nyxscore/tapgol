@@ -6,7 +6,6 @@ import { getUserProfile } from "../util/userService";
 import { 
   subscribeToChatMessages, 
   createChatMessage, 
-  updateChatMessage, 
   deleteChatMessage 
 } from "../util/chatService";
 import {
@@ -14,7 +13,8 @@ import {
   removeOnlineUser,
   subscribeToOnlineUsers
 } from "../util/onlineUsersService";
-import { createChatNotification } from "../util/notificationService";
+import { createChatNotification, markChatNotificationsAsRead } from "../util/notificationService";
+import { formatTextWithLinks } from "../util/textUtils.jsx";
 
 const TapgolChat = () => {
   const navigate = useNavigate();
@@ -23,8 +23,6 @@ const TapgolChat = () => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState("");
-  const [editingMessage, setEditingMessage] = useState(null);
-  const [editText, setEditText] = useState("");
   const [sending, setSending] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [showOnlineUsers, setShowOnlineUsers] = useState(false);
@@ -83,6 +81,19 @@ const TapgolChat = () => {
       console.error("접속자 목록 구독 오류:", error);
     }
 
+    // 채팅 페이지에 접속하면 채팅 관련 알림을 읽음 처리
+    if (user) {
+      try {
+        const processedCount = markChatNotificationsAsRead();
+        if (processedCount > 0) {
+          console.log(`${processedCount}개의 채팅 관련 알림이 읽음 처리되었습니다.`);
+        }
+      } catch (notificationError) {
+        console.error("채팅 알림 읽음 처리 오류:", notificationError);
+        // 알림 처리 실패는 채팅에 영향을 주지 않도록 함
+      }
+    }
+
     return () => {
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
@@ -91,7 +102,7 @@ const TapgolChat = () => {
         onlineUsersUnsubscribeRef.current();
       }
     };
-  }, []);
+  }, [user]);
 
   // 페이지를 벗어날 때 접속자 목록에서 제거
   useEffect(() => {
@@ -108,8 +119,16 @@ const TapgolChat = () => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
+  // 컴포넌트 언마운트 시 접속자 제거
+  useEffect(() => {
+    return () => {
       if (currentOnlineUserRef.current) {
-        removeOnlineUser(currentOnlineUserRef.current.id);
+        removeOnlineUser(currentOnlineUserRef.current.id).catch(error => {
+          console.error("컴포넌트 언마운트 시 접속자 제거 오류:", error);
+        });
       }
     };
   }, []);
@@ -163,21 +182,7 @@ const TapgolChat = () => {
     }
   };
 
-  const handleEditMessage = async (messageId) => {
-    if (!editText.trim()) {
-      alert("메시지 내용을 입력해주세요.");
-      return;
-    }
 
-    try {
-      await updateChatMessage(messageId, { content: editText.trim() });
-      setEditingMessage(null);
-      setEditText("");
-    } catch (error) {
-      console.error("메시지 수정 오류:", error);
-      alert("메시지 수정에 실패했습니다.");
-    }
-  };
 
   const handleDeleteMessage = async (messageId) => {
     if (!window.confirm("정말로 이 메시지를 삭제하시겠습니까?")) {
@@ -192,15 +197,7 @@ const TapgolChat = () => {
     }
   };
 
-  const startEdit = (message) => {
-    setEditingMessage(message.id);
-    setEditText(message.content);
-  };
 
-  const cancelEdit = () => {
-    setEditingMessage(null);
-    setEditText("");
-  };
 
   const formatDate = (timestamp) => {
     if (!timestamp) return "";
@@ -320,113 +317,94 @@ const TapgolChat = () => {
                     <p className="text-sm text-gray-400 mt-1">첫 번째 메시지를 작성해보세요!</p>
                   )}
                 </div>
-              ) : (
-                messages.map((message) => (
-                  <div key={message.id} className="flex space-x-3">
-                    <div className="w-8 h-8 bg-amber-600 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
-                      {message.author?.[0] || "익"}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center space-x-2">
-                          <span className="font-medium text-gray-800">{message.author}</span>
-                          <span className="text-xs text-gray-500">{formatDate(message.createdAt)}</span>
+                             ) : (
+                                   messages.map((message) => {
+                    const isMyMessage = isMessageAuthor(message);
+                    return (
+                      <div key={message.id} className={`flex ${isMyMessage ? 'justify-start' : 'justify-end'} mb-3`}>
+                        {isMyMessage && (
+                          <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 mr-2">
+                            {userData?.nickname?.[0] || userData?.name?.[0] || user.displayName?.[0] || "나"}
+                          </div>
+                        )}
+                        <div className={`max-w-xs lg:max-w-md ${isMyMessage ? 'order-1' : 'order-2'}`}>
+                          {isMyMessage && (
+                            <div className="flex items-center space-x-2 mb-1">
+                              <span className="font-medium text-gray-800 text-sm">{message.author}</span>
+                              <span className="text-xs text-gray-500">{formatDate(message.createdAt)}</span>
+                            </div>
+                          )}
+                                                     <div className={`rounded-2xl px-4 py-2 ${
+                             isMyMessage 
+                               ? 'bg-amber-500 text-white rounded-bl-md' 
+                               : 'bg-gray-200 text-gray-800 rounded-br-md'
+                           }`}>
+                             <div className="whitespace-pre-wrap break-words text-sm">
+                               {formatTextWithLinks(message.content)}
+                             </div>
+                           </div>
+                                                     {!isMyMessage && (
+                             <div className="flex items-center justify-start space-x-1 mt-1">
+                               <span className="text-xs text-gray-500">{formatDate(message.createdAt)}</span>
+                               <span className="text-xs text-gray-400">• {message.author}</span>
+                             </div>
+                           )}
+                                                     {isMyMessage && (
+                             <div className="flex items-center justify-start space-x-1 mt-1">
+                               <span className="text-xs text-gray-500">{formatDate(message.createdAt)}</span>
+                               <button
+                                 onClick={() => handleDeleteMessage(message.id)}
+                                 className="text-xs text-red-600 hover:text-red-800 transition-colors"
+                               >
+                                 삭제
+                               </button>
+                             </div>
+                           )}
                         </div>
-                        {isMessageAuthor(message) && (
-                          <div className="flex space-x-1">
-                            <button
-                              onClick={() => startEdit(message)}
-                              className="text-xs text-blue-600 hover:text-blue-800 transition-colors"
-                            >
-                              수정
-                            </button>
-                            <button
-                              onClick={() => handleDeleteMessage(message.id)}
-                              className="text-xs text-red-600 hover:text-red-800 transition-colors"
-                            >
-                              삭제
-                            </button>
+                        {!isMyMessage && (
+                          <div className="w-8 h-8 bg-amber-600 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 ml-2">
+                            {message.author?.[0] || "익"}
                           </div>
                         )}
                       </div>
-                      <p className="text-gray-700 whitespace-pre-wrap break-words">{message.content}</p>
-                    </div>
-                  </div>
-                ))
-              )}
+                    );
+                  })
+               )}
               <div ref={messagesEndRef} />
             </div>
           </div>
 
-          {/* Message Input */}
-          {user ? (
-            <div className="bg-white rounded-2xl shadow-xl p-6">
-              {editingMessage ? (
-                // Edit Mode
-                <form onSubmit={(e) => { e.preventDefault(); handleEditMessage(editingMessage); }}>
-                  <div className="flex space-x-3">
-                    <div className="flex-1">
-                      <textarea
-                        value={editText}
-                        onChange={(e) => setEditText(e.target.value)}
-                        placeholder="메시지를 수정하세요..."
-                        rows="3"
-                        maxLength="500"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
-                      />
-                      <div className="flex justify-between items-center mt-2">
-                        <span className="text-xs text-gray-500">{editText.length}/500</span>
-                        <div className="flex space-x-2">
-                          <button
-                            type="button"
-                            onClick={cancelEdit}
-                            className="px-3 py-1 text-gray-600 hover:text-gray-800 transition-colors"
-                          >
-                            취소
-                          </button>
-                          <button
-                            type="submit"
-                            disabled={!editText.trim()}
-                            className="px-3 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 transition-colors disabled:opacity-50"
-                          >
-                            저장
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </form>
-              ) : (
-                // Send Mode
-                <form onSubmit={handleSubmitMessage}>
-                  <div className="flex space-x-3">
-                    <div className="w-8 h-8 bg-amber-600 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
-                      {userData?.nickname?.[0] || userData?.name?.[0] || user.displayName?.[0] || "익"}
-                    </div>
-                    <div className="flex-1">
-                      <textarea
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="메시지를 입력하세요..."
-                        rows="3"
-                        maxLength="500"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
-                      />
-                      <div className="flex justify-between items-center mt-2">
-                        <span className="text-xs text-gray-500">{newMessage.length}/500</span>
-                        <button
-                          type="submit"
-                          disabled={sending || !newMessage.trim()}
-                          className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {sending ? "전송 중..." : "전송"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </form>
-              )}
-            </div>
+                     {/* Message Input */}
+           {user ? (
+             <div className="bg-white rounded-2xl shadow-xl p-6">
+               <form onSubmit={handleSubmitMessage}>
+                 <div className="flex space-x-3">
+                   <div className="w-8 h-8 bg-amber-600 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                     {userData?.nickname?.[0] || userData?.name?.[0] || user.displayName?.[0] || "익"}
+                   </div>
+                   <div className="flex-1">
+                     <textarea
+                       value={newMessage}
+                       onChange={(e) => setNewMessage(e.target.value)}
+                       placeholder="메시지를 입력하세요..."
+                       rows="3"
+                       maxLength="500"
+                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
+                     />
+                     <div className="flex justify-between items-center mt-2">
+                       <span className="text-xs text-gray-500">{newMessage.length}/500</span>
+                       <button
+                         type="submit"
+                         disabled={sending || !newMessage.trim()}
+                         className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                       >
+                         {sending ? "전송 중..." : "전송"}
+                       </button>
+                     </div>
+                   </div>
+                 </div>
+               </form>
+             </div>
           ) : (
             <div className="bg-white rounded-2xl shadow-xl p-6">
               <div className="text-center py-4">

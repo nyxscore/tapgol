@@ -8,6 +8,7 @@ import {
   updateKaraokeComment, 
   deleteKaraokeComment 
 } from "../util/karaokeCommentService";
+import { formatTextWithLinks } from "../util/textUtils.jsx";
 
 const KaraokeCommentSection = ({ postId }) => {
   const [comments, setComments] = useState([]);
@@ -256,7 +257,9 @@ const KaraokeCommentSection = ({ postId }) => {
                         </div>
                       )}
                     </div>
-                    <p className="text-gray-700 whitespace-pre-wrap">{comment.content}</p>
+                    <div className="text-gray-700 whitespace-pre-wrap">
+                      {formatTextWithLinks(comment.content)}
+                    </div>
                   </div>
                 </div>
               )}
