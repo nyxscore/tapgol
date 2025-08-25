@@ -106,7 +106,7 @@ export const updateUserProfile = async (userId, updateData) => {
   }
 };
 
-// 사용자 계정 삭제
+// 회원탈퇴 (사용자 계정 및 데이터 완전 삭제)
 export const deleteUserAccount = async (userId) => {
   try {
     // 인증 상태 확인
@@ -117,11 +117,64 @@ export const deleteUserAccount = async (userId) => {
       throw new Error("본인의 계정만 삭제할 수 있습니다.");
     }
     
-    await deleteDoc(doc(db, "users", userId));
+    // 1. 사용자가 작성한 게시글들 삭제
+    const postsQuery = query(
+      collection(db, "posts"),
+      where("authorId", "==", userId)
+    );
+    const postsSnapshot = await getDocs(postsQuery);
+    const postsDeletePromises = postsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+    
+    // 2. 사용자가 작성한 댓글들 삭제
+    const commentsQuery = query(
+      collection(db, "comments"),
+      where("authorId", "==", userId)
+    );
+    const commentsSnapshot = await getDocs(commentsQuery);
+    const commentsDeletePromises = commentsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+    
+    // 3. 사용자가 업로드한 갤러리 항목들 삭제
+    const galleryQuery = query(
+      collection(db, "gallery"),
+      where("uploaderId", "==", userId)
+    );
+    const gallerySnapshot = await getDocs(galleryQuery);
+    const galleryDeletePromises = gallerySnapshot.docs.map(doc => deleteDoc(doc.ref));
+    
+    // 4. 사용자가 작성한 건강게시글들 삭제
+    const healthQuery = query(
+      collection(db, "health"),
+      where("authorId", "==", userId)
+    );
+    const healthSnapshot = await getDocs(healthQuery);
+    const healthDeletePromises = healthSnapshot.docs.map(doc => deleteDoc(doc.ref));
+    
+    // 5. 사용자가 업로드한 노래방 영상들 삭제
+    const karaokeQuery = query(
+      collection(db, "karaoke"),
+      where("authorId", "==", userId)
+    );
+    const karaokeSnapshot = await getDocs(karaokeQuery);
+    const karaokeDeletePromises = karaokeSnapshot.docs.map(doc => deleteDoc(doc.ref));
+    
+    // 6. 사용자 프로필 데이터 삭제
+    const userDeletePromise = deleteDoc(doc(db, "users", userId));
+    
+    // 모든 삭제 작업을 병렬로 실행
+    await Promise.all([
+      ...postsDeletePromises,
+      ...commentsDeletePromises,
+      ...galleryDeletePromises,
+      ...healthDeletePromises,
+      ...karaokeDeletePromises,
+      userDeletePromise
+    ]);
+    
+    console.log(`사용자 ${userId}의 모든 데이터가 삭제되었습니다.`);
     return true;
   } catch (error) {
-    console.error("사용자 계정 삭제 오류:", error);
-    throw error;
+    console.error("회원탈퇴 오류:", error);
+    throw new Error("회원탈퇴 처리 중 오류가 발생했습니다.");
   }
 };
 

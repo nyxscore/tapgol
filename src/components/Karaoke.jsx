@@ -180,10 +180,23 @@ const Karaoke = () => {
                       src={post.videoUrl}
                       className="w-full h-48 object-cover"
                       muted
-                      onMouseOver={(e) => e.target.play()}
+                      onMouseOver={async (e) => {
+                        try {
+                          await e.target.play();
+                        } catch (error) {
+                          // AbortError는 무시 (사용자가 빠르게 마우스를 움직일 때 발생)
+                          if (error.name !== 'AbortError') {
+                            console.error('비디오 재생 오류:', error);
+                          }
+                        }
+                      }}
                       onMouseOut={(e) => {
-                        e.target.pause();
-                        e.target.currentTime = 0;
+                        try {
+                          e.target.pause();
+                          e.target.currentTime = 0;
+                        } catch (error) {
+                          console.error('비디오 일시정지 오류:', error);
+                        }
                       }}
                     />
                     <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded flex items-center space-x-1">

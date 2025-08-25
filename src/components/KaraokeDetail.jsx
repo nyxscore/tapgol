@@ -4,7 +4,7 @@ import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getKaraokePost, incrementViews, toggleLike, deleteKaraokePost } from "../util/karaokeService";
 import { formatFileSize } from "../util/karaokeService";
-import KaraokeCommentSection from "./KaraokeCommentSection";
+import CommentSection from "./CommentSection";
 
 const KaraokeDetail = () => {
   const { id } = useParams();
@@ -27,7 +27,22 @@ const KaraokeDetail = () => {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      // 컴포넌트 언마운트 시 비디오 정리
+      const videoElement = document.querySelector('video');
+      if (videoElement) {
+        try {
+          videoElement.pause();
+          videoElement.currentTime = 0;
+        } catch (error) {
+          // AbortError는 무시
+          if (error.name !== 'AbortError') {
+            console.error('비디오 정리 오류:', error);
+          }
+        }
+      }
+    };
   }, [id]);
 
   const loadPost = async () => {
@@ -267,7 +282,9 @@ const KaraokeDetail = () => {
           </div>
 
           {/* Comments Section */}
-          <KaraokeCommentSection postId={id} />
+          <div className="bg-white rounded-2xl shadow-xl p-6">
+            <CommentSection postId={id} boardType="karaoke" />
+          </div>
         </div>
       </main>
     </div>

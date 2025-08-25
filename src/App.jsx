@@ -31,6 +31,7 @@ import HealthEdit from "./components/HealthEdit";
 import ParkMeetings from "./components/ParkMeetings";
 import Alerts from "./components/Alerts";
 import NotificationBoard from "./components/NotificationBoard";
+import ParkChat from "./components/ParkChat";
 import BadukGame from "./components/games/BadukGame";
 import JanggiGame from "./components/games/JanggiGame";
 import GostopGame from "./components/games/GostopGame";
@@ -80,6 +81,7 @@ export default function App() {
               <Route path="/health/:id" element={<HealthDetail />} />
               <Route path="/health/edit/:id" element={<HealthEdit />} />
               <Route path="/park-meetings" element={<ParkMeetings />} />
+              <Route path="/community/:parkId/chat" element={<ParkChat />} />
               <Route path="/alerts" element={<Alerts />} />
               <Route path="/notification-board" element={<NotificationBoard />} />
               <Route path="/baduk-game" element={<BadukGame />} />

@@ -9,52 +9,102 @@ import {
   query, 
   where, 
   orderBy, 
-  serverTimestamp 
+  serverTimestamp,
+  setDoc
 } from "firebase/firestore";
 import { db } from "./firebase";
 
-// 댓글 작성
-export const createComment = async (postId, commentData) => {
+
+// 댓글 작성 (통합)
+export const createComment = async (postId, commentData, boardType = "board") => {
   try {
+    console.log("댓글 작성 시작:", { postId, boardType, commentData });
+    
     const commentWithTimestamp = {
       ...commentData,
       postId,
+      boardType, // 게시판 타입 추가 (board, gallery, health, karaoke 등)
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       likes: 0
     };
     
+    console.log("Firestore에 저장할 데이터:", commentWithTimestamp);
+    
     const docRef = await addDoc(collection(db, "comments"), commentWithTimestamp);
-    return { id: docRef.id, ...commentWithTimestamp };
+    console.log("댓글 저장 성공, 문서 ID:", docRef.id);
+    
+    const result = { id: docRef.id, ...commentWithTimestamp };
+    console.log("반환할 댓글 데이터:", result);
+    
+    return result;
   } catch (error) {
     console.error("댓글 작성 오류:", error);
+    console.error("오류 상세 정보:", {
+      code: error.code,
+      message: error.message,
+      stack: error.stack
+    });
     throw new Error("댓글 작성에 실패했습니다.");
   }
 };
 
-// 게시글의 댓글 목록 조회
-export const getComments = async (postId) => {
+// 게시글의 댓글 목록 조회 (통합)
+export const getComments = async (postId, boardType = "board") => {
   try {
-    const q = query(
-      collection(db, "comments"),
-      where("postId", "==", postId),
-      orderBy("createdAt", "asc")
-    );
+    // 기존 댓글들과의 호환성을 위해 두 가지 쿼리 시도
+    let comments = [];
     
-    const querySnapshot = await getDocs(q);
-    const comments = [];
-    
-    querySnapshot.forEach((doc) => {
-      comments.push({
-        id: doc.id,
-        ...doc.data()
+    try {
+      // 1. 새로운 형식 (boardType이 있는 댓글들)
+      const newQuery = query(
+        collection(db, "comments"),
+        where("postId", "==", postId),
+        where("boardType", "==", boardType)
+        // orderBy 제거하여 인덱스 문제 방지
+      );
+      
+      const newQuerySnapshot = await getDocs(newQuery);
+      newQuerySnapshot.forEach((doc) => {
+        comments.push({
+          id: doc.id,
+          ...doc.data()
+        });
       });
+    } catch (newQueryError) {
+      console.log("새로운 형식 쿼리 실패, 기존 형식으로 시도:", newQueryError);
+      
+      // 2. 기존 형식 (boardType이 없는 댓글들)
+      const oldQuery = query(
+        collection(db, "comments"),
+        where("postId", "==", postId)
+        // orderBy 제거하여 인덱스 문제 방지
+      );
+      
+      const oldQuerySnapshot = await getDocs(oldQuery);
+      oldQuerySnapshot.forEach((doc) => {
+        const data = doc.data();
+        // 기존 댓글에 boardType 필드 추가
+        comments.push({
+          id: doc.id,
+          ...data,
+          boardType: data.boardType || boardType // 기존에 없으면 현재 boardType으로 설정
+        });
+      });
+    }
+    
+    // 클라이언트에서 날짜순으로 정렬
+    comments.sort((a, b) => {
+      const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+      const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+      return dateA - dateB;
     });
     
     return comments;
   } catch (error) {
     console.error("댓글 목록 조회 오류:", error);
-    throw new Error("댓글 목록을 불러오는데 실패했습니다.");
+    // 오류가 발생해도 빈 배열 반환하여 앱이 중단되지 않도록 함
+    return [];
   }
 };
 
@@ -128,3 +178,86 @@ export const getCommentsByUser = async (userId) => {
     throw new Error("사용자 댓글을 불러오는데 실패했습니다.");
   }
 };
+
+// 기존 서비스들과의 호환성을 위한 별칭 함수들
+export const createGalleryComment = async (galleryId, commentData) => {
+  return createComment(galleryId, commentData, "gallery");
+};
+
+export const getGalleryComments = async (galleryId) => {
+  return getComments(galleryId, "gallery");
+};
+
+export const updateGalleryComment = async (commentId, updateData) => {
+  return updateComment(commentId, updateData);
+};
+
+export const deleteGalleryComment = async (commentId) => {
+  return deleteComment(commentId);
+};
+
+export const createHealthComment = async (healthId, commentData) => {
+  return createComment(healthId, commentData, "health");
+};
+
+export const getHealthComments = async (healthId) => {
+  return getComments(healthId, "health");
+};
+
+export const updateHealthComment = async (commentId, updateData) => {
+  return updateComment(commentId, updateData);
+};
+
+export const deleteHealthComment = async (commentId) => {
+  return deleteComment(commentId);
+};
+
+export const createKaraokeComment = async (karaokeId, commentData) => {
+  return createComment(karaokeId, commentData, "karaoke");
+};
+
+export const getKaraokeComments = async (karaokeId) => {
+  return getComments(karaokeId, "karaoke");
+};
+
+export const updateKaraokeComment = async (commentId, updateData) => {
+  return updateComment(commentId, updateData);
+};
+
+export const deleteKaraokeComment = async (commentId) => {
+  return deleteComment(commentId);
+};
+
+// 기존 댓글들을 새로운 형식으로 마이그레이션 (관리자용)
+export const migrateComments = async () => {
+  try {
+    const querySnapshot = await getDocs(collection(db, "comments"));
+    const migrationPromises = [];
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      // boardType이 없는 기존 댓글들에 boardType 추가
+      if (!data.boardType) {
+        migrationPromises.push(
+          updateDoc(doc.ref, {
+            boardType: "board" // 기본값으로 board 설정
+          })
+        );
+      }
+    });
+    
+    if (migrationPromises.length > 0) {
+      await Promise.all(migrationPromises);
+      console.log(`${migrationPromises.length}개의 댓글 마이그레이션 완료`);
+    } else {
+      console.log("마이그레이션이 필요한 댓글이 없습니다.");
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("댓글 마이그레이션 오류:", error);
+    throw error;
+  }
+};
+
+

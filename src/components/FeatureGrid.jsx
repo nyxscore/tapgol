@@ -56,8 +56,18 @@ const FeatureGrid = () => {
   ];
 
   const handleFeatureClick = (feature) => {
+    console.log('Feature clicked:', feature);
     if (feature.path) {
-      navigate(feature.path);
+      console.log('Navigating to:', feature.path);
+      try {
+        navigate(feature.path);
+      } catch (error) {
+        console.error('Navigation error:', error);
+        // 네비게이션 실패 시 window.location 사용
+        window.location.href = feature.path;
+      }
+    } else {
+      console.error('No path defined for feature:', feature);
     }
   };
 

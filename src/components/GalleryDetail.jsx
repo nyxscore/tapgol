@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getGalleryItem, incrementViews, deleteGalleryItem, toggleLike } from "../util/galleryService";
-import GalleryCommentSection from "./GalleryCommentSection";
+import CommentSection from "./CommentSection";
 
 const GalleryDetail = () => {
   const { id } = useParams();
@@ -41,7 +41,22 @@ const GalleryDetail = () => {
       loadItem();
     }
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      // 컴포넌트 언마운트 시 비디오 정리
+      const videoElement = document.querySelector('video');
+      if (videoElement) {
+        try {
+          videoElement.pause();
+          videoElement.currentTime = 0;
+        } catch (error) {
+          // AbortError는 무시
+          if (error.name !== 'AbortError') {
+            console.error('비디오 정리 오류:', error);
+          }
+        }
+      }
+    };
   }, [id, user, navigate]);
 
   const formatDate = (timestamp) => {
@@ -323,7 +338,7 @@ const GalleryDetail = () => {
 
         {/* 댓글 섹션 */}
         <div className="bg-white rounded-2xl shadow-xl p-6">
-          <GalleryCommentSection galleryId={id} />
+          <CommentSection postId={id} boardType="gallery" />
         </div>
       </div>
     </div>

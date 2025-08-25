@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 
 const Community = () => {
   const navigate = useNavigate();
+  
+  console.log('Community component rendered');
 
   const parks = [
     {
@@ -62,7 +64,11 @@ const Community = () => {
   ];
 
   const handleParkClick = (parkId) => {
-    navigate(`/community/${parkId}`);
+    console.log('Park clicked:', parkId);
+    // parkId를 문자열로 변환하여 일관성 보장
+    const parkIdStr = String(parkId);
+    // 해당 공원의 채팅방으로 이동
+    navigate(`/community/${parkIdStr}/chat`);
   };
 
   return (

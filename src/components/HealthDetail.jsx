@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getHealthPost, incrementViews, deleteHealthPost, toggleLike } from "../util/healthService";
-import HealthCommentSection from "./HealthCommentSection";
+import CommentSection from "./CommentSection";
 
 const HealthDetail = () => {
   const { id } = useParams();
@@ -248,7 +248,7 @@ const HealthDetail = () => {
 
         {/* Comment Section */}
         <div className="bg-white rounded-2xl shadow-xl p-6">
-          <HealthCommentSection postId={id} />
+          <CommentSection postId={id} boardType="health" />
         </div>
       </div>
     </div>
