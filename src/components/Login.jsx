@@ -1,8 +1,7 @@
 // src/components/Login.jsx
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../util/firebase";
+import { useAuth } from "../contexts/AuthContext";
 
 const Login = () => {
   const [id, setId] = useState("");
@@ -14,6 +13,7 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from || "/";
+  const { login } = useAuth();
 
   // 입력 필드 검증
   const validateInputs = () => {
@@ -52,8 +52,8 @@ const Login = () => {
     }
 
     try {
-      // Firebase 로그인
-      await signInWithEmailAndPassword(auth, id + "@tapgol.com", password);
+      // AuthContext를 통한 로그인
+      await login(id + "@tapgol.com", password);
       navigate(from, { replace: true });
     } catch (error) {
       console.error("로그인 오류:", error);

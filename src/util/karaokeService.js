@@ -7,7 +7,7 @@ import {
 } from "firebase/storage";
 import { db, storage } from "./firebase";
 
-// 노래방 영상 업로드
+// 노래자랑 영상 업로드
 export const uploadKaraokeVideo = async (file, userId) => {
   try {
     const timestamp = Date.now();
@@ -22,12 +22,12 @@ export const uploadKaraokeVideo = async (file, userId) => {
       fileName: fileName
     };
   } catch (error) {
-    console.error("노래방 영상 업로드 오류:", error);
+    console.error("노래자랑 영상 업로드 오류:", error);
     throw new Error("영상 업로드에 실패했습니다.");
   }
 };
 
-// 노래방 게시글 작성
+// 노래자랑 게시글 작성
 export const createKaraokePost = async (postData) => {
   try {
     const postWithTimestamp = {
@@ -42,12 +42,12 @@ export const createKaraokePost = async (postData) => {
     const docRef = await addDoc(collection(db, "karaokePosts"), postWithTimestamp);
     return { id: docRef.id, ...postWithTimestamp };
   } catch (error) {
-    console.error("노래방 게시글 작성 오류:", error);
+    console.error("노래자랑 게시글 작성 오류:", error);
     throw new Error("게시글 작성에 실패했습니다.");
   }
 };
 
-// 노래방 게시글 목록 조회
+// 노래자랑 게시글 목록 조회
 export const getKaraokePosts = async (limitCount = 20) => {
   try {
     const q = query(
@@ -68,12 +68,12 @@ export const getKaraokePosts = async (limitCount = 20) => {
     
     return posts;
   } catch (error) {
-    console.error("노래방 게시글 목록 조회 오류:", error);
+    console.error("노래자랑 게시글 목록 조회 오류:", error);
     throw new Error("게시글 목록을 불러오는데 실패했습니다.");
   }
 };
 
-// 특정 노래방 게시글 조회
+// 특정 노래자랑 게시글 조회
 export const getKaraokePost = async (postId) => {
   try {
     const docRef = doc(db, "karaokePosts", postId);
@@ -88,12 +88,12 @@ export const getKaraokePost = async (postId) => {
       throw new Error("게시글을 찾을 수 없습니다.");
     }
   } catch (error) {
-    console.error("노래방 게시글 조회 오류:", error);
+    console.error("노래자랑 게시글 조회 오류:", error);
     throw new Error("게시글을 불러오는데 실패했습니다.");
   }
 };
 
-// 노래방 게시글 수정
+// 노래자랑 게시글 수정
 export const updateKaraokePost = async (postId, updateData) => {
   try {
     const postRef = doc(db, "karaokePosts", postId);
@@ -102,12 +102,12 @@ export const updateKaraokePost = async (postId, updateData) => {
       updatedAt: serverTimestamp()
     });
   } catch (error) {
-    console.error("노래방 게시글 수정 오류:", error);
+    console.error("노래자랑 게시글 수정 오류:", error);
     throw new Error("게시글 수정에 실패했습니다.");
   }
 };
 
-// 노래방 게시글 삭제
+// 노래자랑 게시글 삭제
 export const deleteKaraokePost = async (postId, fileName) => {
   try {
     // Firestore에서 게시글 삭제
@@ -120,7 +120,7 @@ export const deleteKaraokePost = async (postId, fileName) => {
       await deleteObject(videoRef);
     }
   } catch (error) {
-    console.error("노래방 게시글 삭제 오류:", error);
+    console.error("노래자랑 게시글 삭제 오류:", error);
     throw new Error("게시글 삭제에 실패했습니다.");
   }
 };
@@ -172,7 +172,7 @@ export const toggleLike = async (postId, userId) => {
   }
 };
 
-// 사용자별 노래방 게시글 조회
+// 사용자별 노래자랑 게시글 조회
 export const getKaraokePostsByUser = async (userId) => {
   try {
     const q = query(
@@ -193,7 +193,7 @@ export const getKaraokePostsByUser = async (userId) => {
     
     return posts;
   } catch (error) {
-    console.error("사용자 노래방 게시글 조회 오류:", error);
+    console.error("사용자 노래자랑 게시글 조회 오류:", error);
     throw new Error("사용자 게시글을 불러오는데 실패했습니다.");
   }
 };

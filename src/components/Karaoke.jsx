@@ -27,7 +27,7 @@ const Karaoke = () => {
       const postsData = await getKaraokePosts();
       setPosts(postsData);
     } catch (error) {
-      console.error("노래방 게시글 로드 오류:", error);
+      console.error("노래자랑 게시글 로드 오류:", error);
       setError("게시글을 불러오는데 실패했습니다.");
     } finally {
       setLoading(false);
@@ -107,7 +107,7 @@ const Karaoke = () => {
           <div className="max-w-4xl mx-auto px-4">
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-700 mx-auto mb-4"></div>
-              <p className="text-amber-700">노래방 영상을 불러오는 중...</p>
+              <p className="text-amber-700">노래자랑 영상을 불러오는 중...</p>
             </div>
           </div>
         </main>
@@ -141,7 +141,7 @@ const Karaoke = () => {
         <div className="max-w-4xl mx-auto px-4">
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
-              <h1 className="text-2xl font-bold text-gray-800">노래방</h1>
+              <h1 className="text-2xl font-bold text-gray-800">노래자랑</h1>
               <button
                 onClick={handleUploadClick}
                 className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center space-x-2"
@@ -152,19 +152,19 @@ const Karaoke = () => {
                 <span>업로드</span>
               </button>
             </div>
-            <p className="text-gray-600">노래 영상을 공유하고 소통해보세요</p>
+                           <p className="text-gray-600">노래자랑 영상을 공유하고 소통해보세요</p>
           </div>
 
           {posts.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-gray-400 text-6xl mb-4">🎤</div>
-              <p className="text-gray-600 text-lg mb-2">아직 노래방 영상이 없습니다</p>
-              <p className="text-gray-500 mb-6">첫 번째 노래 영상을 업로드해보세요!</p>
+                             <p className="text-gray-600 text-lg mb-2">아직 노래자랑 영상이 없습니다</p>
+                             <p className="text-gray-500 mb-6">첫 번째 노래자랑 영상을 업로드해보세요!</p>
               <button
                 onClick={handleUploadClick}
                 className="bg-amber-600 text-white px-6 py-3 rounded-lg hover:bg-amber-700 transition-colors"
               >
-                노래 영상 업로드하기
+                                 노래자랑 영상 업로드하기
               </button>
             </div>
           ) : (

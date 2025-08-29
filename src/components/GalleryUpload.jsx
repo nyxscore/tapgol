@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getUserProfile } from "../util/userService";
-import { uploadFile, createGalleryItem, getFileType, formatFileSize } from "../util/galleryService";
+import { uploadFile, createGalleryItem, getFileType } from "../util/galleryService";
 
 const GalleryUpload = () => {
   const navigate = useNavigate();
@@ -244,9 +244,6 @@ const GalleryUpload = () => {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
                       {selectedFile.name}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {formatFileSize(selectedFile.size)} • {selectedFile.type}
                     </p>
                   </div>
                 </div>

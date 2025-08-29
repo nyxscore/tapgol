@@ -17,7 +17,6 @@ import Login from "./components/Login";
 import Signup from "./components/Signup";
 import Profile from "./components/Profile";
 import Chat from "./components/Chat";
-import TapgolChat from "./components/TapgolChat";
 import Community from "./components/Community";
 import Events from "./components/Events";
 import Karaoke from "./components/Karaoke";
@@ -31,7 +30,7 @@ import HealthEdit from "./components/HealthEdit";
 import ParkMeetings from "./components/ParkMeetings";
 import Alerts from "./components/Alerts";
 import NotificationBoard from "./components/NotificationBoard";
-import ParkChat from "./components/ParkChat";
+
 import BadukGame from "./components/games/BadukGame";
 import JanggiGame from "./components/games/JanggiGame";
 import GostopGame from "./components/games/GostopGame";
@@ -39,6 +38,10 @@ import YutnoriGame from "./components/games/YutnoriGame";
 import TetrisGame from "./components/games/TetrisGame";
 import AlumniSearch from "./components/AlumniSearch";
 import AlumniResults from "./components/AlumniResults";
+import Marketplace from "./components/Marketplace";
+import MarketplaceWrite from "./components/MarketplaceWrite";
+import MarketplaceDetail from "./components/MarketplaceDetail";
+import MarketplaceEdit from "./components/MarketplaceEdit";
 
 // 메인 레이아웃 컴포넌트
 function MainLayout() {
@@ -71,7 +74,8 @@ export default function App() {
               <Route path="/gallery/upload" element={<GalleryUpload />} />
               <Route path="/gallery/:id" element={<GalleryDetail />} />
               <Route path="/chat" element={<Chat />} />
-              <Route path="/tapgol-chat" element={<TapgolChat />} />
+              <Route path="/chat/main" element={<Chat />} />
+              <Route path="/chat/park/:parkId" element={<Chat />} />
               <Route path="/community" element={<Community />} />
               <Route path="/events" element={<Events />} />
               <Route path="/karaoke" element={<Karaoke />} />
@@ -83,7 +87,7 @@ export default function App() {
               <Route path="/health/:id" element={<HealthDetail />} />
               <Route path="/health/edit/:id" element={<HealthEdit />} />
               <Route path="/park-meetings" element={<ParkMeetings />} />
-              <Route path="/community/:parkId/chat" element={<ParkChat />} />
+
               <Route path="/alerts" element={<Alerts />} />
               <Route path="/notification-board" element={<NotificationBoard />} />
               <Route path="/baduk-game" element={<BadukGame />} />
@@ -93,6 +97,10 @@ export default function App() {
               <Route path="/tetris-game" element={<TetrisGame />} />
               <Route path="/alumni-search" element={<AlumniSearch />} />
               <Route path="/alumni-results" element={<AlumniResults />} />
+              <Route path="/marketplace" element={<Marketplace />} />
+              <Route path="/marketplace/write" element={<MarketplaceWrite />} />
+              <Route path="/marketplace/:id" element={<MarketplaceDetail />} />
+              <Route path="/marketplace/edit/:id" element={<MarketplaceEdit />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/profile" element={<Profile />} />

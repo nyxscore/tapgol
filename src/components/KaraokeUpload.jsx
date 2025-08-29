@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getUserProfile } from "../util/userService";
-import { uploadKaraokeVideo, createKaraokePost, getFileType, formatFileSize } from "../util/karaokeService";
+import { uploadKaraokeVideo, createKaraokePost, getFileType } from "../util/karaokeService";
 
 const KaraokeUpload = () => {
   const navigate = useNavigate();
@@ -109,7 +109,7 @@ const KaraokeUpload = () => {
       // Firestore에 게시글 저장
       await createKaraokePost(postData);
       
-      alert("노래 영상이 업로드되었습니다!");
+             alert("노래자랑 영상이 업로드되었습니다!");
       navigate("/karaoke");
     } catch (error) {
       console.error("업로드 오류:", error);
@@ -153,8 +153,8 @@ const KaraokeUpload = () => {
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">노래 영상 업로드</h1>
-              <p className="text-gray-600 mt-1">노래 영상을 공유해보세요</p>
+                             <h1 className="text-2xl font-bold text-gray-800">노래자랑 영상 업로드</h1>
+               <p className="text-gray-600 mt-1">노래자랑 영상을 공유해보세요</p>
             </div>
             <button
               onClick={handleCancel}
@@ -219,9 +219,6 @@ const KaraokeUpload = () => {
                   )}
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
-                    <p className="text-xs text-gray-500">
-                      {getFileType(selectedFile.type)} • {formatFileSize(selectedFile.size)}
-                    </p>
                   </div>
                 </div>
               </div>

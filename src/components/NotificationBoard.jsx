@@ -71,7 +71,7 @@ const NotificationBoard = () => {
       // 채팅 알림인 경우 채팅 페이지로 이동
       if (notification.category === "chat") {
         await markNotificationAsRead(notification.id);
-        navigate("/tapgol-chat");
+        navigate("/chat");
         return;
       }
       

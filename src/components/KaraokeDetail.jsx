@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getKaraokePost, incrementViews, toggleLike, deleteKaraokePost } from "../util/karaokeService";
-import { formatFileSize } from "../util/karaokeService";
+
 import { markNotificationsByPostIdAsRead } from "../util/notificationService";
 import { formatTextWithLinks } from "../util/textUtils.jsx";
 import CommentSection from "./CommentSection";
@@ -60,11 +60,11 @@ const KaraokeDetail = () => {
         await incrementViews(id);
         setPost(prev => ({ ...prev, views: (prev?.views || 0) + 1 }));
         
-        // 이 노래방 게시글과 관련된 알림을 읽음 처리
+        // 이 노래자랑 게시글과 관련된 알림을 읽음 처리
         try {
           const processedCount = await markNotificationsByPostIdAsRead(id, "karaoke");
           if (processedCount > 0) {
-            console.log(`${processedCount}개의 노래방 관련 알림이 읽음 처리되었습니다.`);
+                         console.log(`${processedCount}개의 노래자랑 관련 알림이 읽음 처리되었습니다.`);
           }
         } catch (notificationError) {
           console.error("알림 읽음 처리 오류:", notificationError);
@@ -77,7 +77,7 @@ const KaraokeDetail = () => {
         setIsLiked(true);
       }
     } catch (error) {
-      console.error("노래방 게시글 로드 오류:", error);
+             console.error("노래자랑 게시글 로드 오류:", error);
       setError("게시글을 불러오는데 실패했습니다.");
     } finally {
       setLoading(false);
@@ -159,7 +159,7 @@ const KaraokeDetail = () => {
           <div className="max-w-4xl mx-auto px-4">
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-700 mx-auto mb-4"></div>
-              <p className="text-amber-700">노래방 영상을 불러오는 중...</p>
+                             <p className="text-amber-700">노래자랑 영상을 불러오는 중...</p>
             </div>
           </div>
         </main>
@@ -180,7 +180,7 @@ const KaraokeDetail = () => {
                 onClick={() => navigate("/karaoke")}
                 className="bg-amber-600 text-white px-6 py-3 rounded-lg hover:bg-amber-700 transition-colors"
               >
-                노래방으로 돌아가기
+                노래자랑으로 돌아가기
               </button>
             </div>
           </div>
@@ -201,7 +201,7 @@ const KaraokeDetail = () => {
             <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
             </svg>
-            노래방으로 돌아가기
+                         노래자랑으로 돌아가기
           </button>
 
           {/* Video Player */}
@@ -273,27 +273,7 @@ const KaraokeDetail = () => {
               </div>
             </div>
 
-            {/* File Info */}
-            <div className="border-t pt-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-500">파일 크기:</span>
-                  <p className="font-medium">{formatFileSize(post.fileSize)}</p>
-                </div>
-                <div>
-                  <span className="text-gray-500">파일 형식:</span>
-                  <p className="font-medium">{post.fileType}</p>
-                </div>
-                <div>
-                  <span className="text-gray-500">업로드 시간:</span>
-                  <p className="font-medium">{formatDate(post.createdAt)}</p>
-                </div>
-                <div>
-                  <span className="text-gray-500">업로더:</span>
-                  <p className="font-medium">{post.author}</p>
-                </div>
-              </div>
-            </div>
+
           </div>
 
           {/* Comments Section */}

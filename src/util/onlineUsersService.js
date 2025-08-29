@@ -14,7 +14,8 @@ export const addOnlineUser = async (userData) => {
       // 기존 사용자가 있으면 업데이트
       await updateOnlineUser(existingUser.id, {
         lastSeen: serverTimestamp(),
-        isOnline: true
+        isOnline: true,
+        lastActivity: serverTimestamp()
       });
       return existingUser;
     }
@@ -23,6 +24,7 @@ export const addOnlineUser = async (userData) => {
     const onlineUserData = {
       ...userData,
       lastSeen: serverTimestamp(),
+      lastActivity: serverTimestamp(),
       isOnline: true
     };
     
@@ -48,6 +50,19 @@ export const updateOnlineUser = async (userId, updateData) => {
   }
 };
 
+// 사용자 활동 업데이트 (메시지 전송, 스크롤 등)
+export const updateUserActivity = async (userId) => {
+  try {
+    const userRef = doc(db, "onlineUsers", userId);
+    await updateDoc(userRef, {
+      lastActivity: serverTimestamp(),
+      lastSeen: serverTimestamp()
+    });
+  } catch (error) {
+    console.error("사용자 활동 업데이트 오류:", error);
+  }
+};
+
 // 사용자 접속 해제
 export const removeOnlineUser = async (userId) => {
   try {
@@ -59,29 +74,60 @@ export const removeOnlineUser = async (userId) => {
   }
 };
 
-// 실시간 접속자 목록 구독
-export const subscribeToOnlineUsers = (callback) => {
+// 접속자 목록 조회 (실시간 구독 대신 주기적 조회)
+export const getOnlineUsers = async () => {
   try {
     const q = query(
       collection(db, "onlineUsers"),
       orderBy("lastSeen", "desc")
     );
     
-    return onSnapshot(q, (querySnapshot) => {
-      const onlineUsers = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        // isOnline이 true인 사용자만 필터링
-        if (data.isOnline) {
-          onlineUsers.push({
-            id: doc.id,
-            ...data
-          });
-        }
-      });
-      console.log("접속자 목록 필터링 결과:", onlineUsers);
-      callback(onlineUsers);
+    const querySnapshot = await getDocs(q);
+    const onlineUsers = [];
+    const now = new Date();
+    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      const lastSeen = data.lastSeen?.toDate ? data.lastSeen.toDate() : new Date(data.lastSeen);
+      
+      // isOnline이 true이고 5분 이내에 활동이 있는 사용자만 필터링
+      if (data.isOnline && lastSeen > fiveMinutesAgo) {
+        onlineUsers.push({
+          id: doc.id,
+          ...data
+        });
+      }
     });
+    
+    console.log("접속자 목록 조회 결과:", onlineUsers);
+    return onlineUsers;
+  } catch (error) {
+    console.error("접속자 목록 조회 오류:", error);
+    throw new Error("접속자 목록을 불러오는데 실패했습니다.");
+  }
+};
+
+// 실시간 접속자 목록 구독 (5분마다 업데이트)
+export const subscribeToOnlineUsers = (callback) => {
+  try {
+    // 초기 데이터 로드
+    getOnlineUsers().then(callback);
+    
+    // 5분마다 접속자 목록 업데이트
+    const interval = setInterval(async () => {
+      try {
+        const users = await getOnlineUsers();
+        callback(users);
+      } catch (error) {
+        console.error("접속자 목록 업데이트 오류:", error);
+      }
+    }, 5 * 60 * 1000); // 5분
+    
+    // 구독 해제 함수 반환
+    return () => {
+      clearInterval(interval);
+    };
   } catch (error) {
     console.error("접속자 목록 구독 오류:", error);
     throw new Error("접속자 목록을 불러오는데 실패했습니다.");
@@ -124,7 +170,22 @@ export const cleanupOfflineUsers = async () => {
     const querySnapshot = await getDocs(q);
     const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
     await Promise.all(deletePromises);
+    
+    console.log(`${querySnapshot.docs.length}명의 오프라인 사용자가 정리되었습니다.`);
   } catch (error) {
     console.error("오프라인 사용자 정리 오류:", error);
   }
+};
+
+// 주기적으로 오프라인 사용자 정리 (5분마다)
+export const startPeriodicCleanup = () => {
+  // 초기 정리 실행
+  cleanupOfflineUsers();
+  
+  // 5분마다 정리 실행
+  const interval = setInterval(cleanupOfflineUsers, 5 * 60 * 1000);
+  
+  return () => {
+    clearInterval(interval);
+  };
 };

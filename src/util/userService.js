@@ -149,7 +149,7 @@ export const deleteUserAccount = async (userId) => {
     const healthSnapshot = await getDocs(healthQuery);
     const healthDeletePromises = healthSnapshot.docs.map(doc => deleteDoc(doc.ref));
     
-    // 5. 사용자가 업로드한 노래방 영상들 삭제
+    // 5. 사용자가 업로드한 노래자랑 영상들 삭제
     const karaokeQuery = query(
       collection(db, "karaoke"),
       where("authorId", "==", userId)

@@ -85,15 +85,7 @@ const GalleryDetail = () => {
     });
   };
 
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+
 
   const handleDelete = async () => {
     if (!user || user.uid !== item.uploaderId) {
@@ -280,32 +272,7 @@ const GalleryDetail = () => {
             </div>
           )}
 
-          {/* 파일 정보 */}
-          <div className="mb-8">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">파일 정보</h3>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-600">파일명</p>
-                  <p className="font-medium">{item.originalName}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">파일 크기</p>
-                  <p className="font-medium">{formatFileSize(item.fileSize)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">파일 타입</p>
-                  <p className="font-medium">{item.fileType}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">파일 종류</p>
-                  <p className="font-medium">
-                    {item.fileTypeCategory === 'image' ? '이미지' : '동영상'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+
 
           {/* 좋아요 버튼 */}
           <div className="border-t border-gray-200 pt-6">

@@ -17,7 +17,7 @@ const Profile = () => {
   const navigate = useNavigate();
 
   const interests = [
-    "탁구", "바둑", "장기", "고스톱", "노래방", "운동", "독서", "게임", "음악", "영화"
+    "탁구", "바둑", "장기", "고스톱", "노래자랑", "운동", "독서", "게임", "음악", "영화"
   ];
 
   const [form, setForm] = useState({

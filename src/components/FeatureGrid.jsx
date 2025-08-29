@@ -27,7 +27,7 @@ const FeatureGrid = () => {
       id: 4,
       name: '탑골톡',
       icon: '💬',
-      path: '/tapgol-chat'
+      path: '/chat'
     },
     {
       id: 5,
@@ -49,9 +49,15 @@ const FeatureGrid = () => {
     },
     {
       id: 8,
-      name: '노래방',
+      name: '노래자랑',
       icon: '🎤',
       path: '/karaoke'
+    },
+    {
+      id: 9,
+      name: '중고장터',
+      icon: '🛒',
+      path: '/marketplace'
     }
   ];
 

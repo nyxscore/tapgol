@@ -52,10 +52,10 @@ const PopularPosts = () => {
         bgColor: 'from-red-400 to-red-600',
         label: '건강정보'
       },
-      '노래방': {
+      '노래자랑': {
         icon: '🎤',
         bgColor: 'from-pink-400 to-pink-600',
-        label: '노래방'
+        label: '노래자랑'
       }
     };
 

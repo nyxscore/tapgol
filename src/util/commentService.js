@@ -228,6 +228,130 @@ export const deleteKaraokeComment = async (commentId) => {
   return deleteComment(commentId);
 };
 
+export const createMarketplaceComment = async (marketplaceId, commentData) => {
+  return createComment(marketplaceId, commentData, "marketplace");
+};
+
+export const getMarketplaceComments = async (marketplaceId) => {
+  return getComments(marketplaceId, "marketplace");
+};
+
+export const updateMarketplaceComment = async (commentId, updateData) => {
+  return updateComment(commentId, updateData);
+};
+
+export const deleteMarketplaceComment = async (commentId) => {
+  return deleteComment(commentId);
+};
+
+// 대댓글 작성
+export const createReply = async (commentId, replyData, boardType = "board") => {
+  try {
+    console.log("대댓글 작성 시작:", { commentId, boardType, replyData });
+    
+    const replyWithTimestamp = {
+      ...replyData,
+      commentId,
+      boardType,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      likes: 0
+    };
+    
+    console.log("Firestore에 저장할 대댓글 데이터:", replyWithTimestamp);
+    
+    const docRef = await addDoc(collection(db, "replies"), replyWithTimestamp);
+    console.log("대댓글 저장 성공, 문서 ID:", docRef.id);
+    
+    const result = { id: docRef.id, ...replyWithTimestamp };
+    console.log("반환할 대댓글 데이터:", result);
+    
+    return result;
+  } catch (error) {
+    console.error("대댓글 작성 오류:", error);
+    throw new Error("대댓글 작성에 실패했습니다.");
+  }
+};
+
+// 댓글의 대댓글 목록 조회
+export const getReplies = async (commentId, boardType = "board") => {
+  try {
+    let replies = [];
+    
+    try {
+      // 새로운 형식 (boardType이 있는 대댓글들)
+      const newQuery = query(
+        collection(db, "replies"),
+        where("commentId", "==", commentId),
+        where("boardType", "==", boardType)
+      );
+      
+      const newQuerySnapshot = await getDocs(newQuery);
+      newQuerySnapshot.forEach((doc) => {
+        replies.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+    } catch (newQueryError) {
+      console.log("새로운 형식 대댓글 쿼리 실패, 기존 형식으로 시도:", newQueryError);
+      
+      // 기존 형식 (boardType이 없는 대댓글들)
+      const oldQuery = query(
+        collection(db, "replies"),
+        where("commentId", "==", commentId)
+      );
+      
+      const oldQuerySnapshot = await getDocs(oldQuery);
+      oldQuerySnapshot.forEach((doc) => {
+        const data = doc.data();
+        replies.push({
+          id: doc.id,
+          ...data,
+          boardType: data.boardType || boardType
+        });
+      });
+    }
+    
+    // 클라이언트에서 날짜순으로 정렬
+    replies.sort((a, b) => {
+      const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+      const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+      return dateA - dateB;
+    });
+    
+    return replies;
+  } catch (error) {
+    console.error("대댓글 조회 오류:", error);
+    throw new Error("대댓글을 불러오는데 실패했습니다.");
+  }
+};
+
+// 대댓글 수정
+export const updateReply = async (replyId, updateData) => {
+  try {
+    const replyRef = doc(db, "replies", replyId);
+    await updateDoc(replyRef, {
+      ...updateData,
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error("대댓글 수정 오류:", error);
+    throw new Error("대댓글 수정에 실패했습니다.");
+  }
+};
+
+// 대댓글 삭제
+export const deleteReply = async (replyId) => {
+  try {
+    const replyRef = doc(db, "replies", replyId);
+    await deleteDoc(replyRef);
+  } catch (error) {
+    console.error("대댓글 삭제 오류:", error);
+    throw new Error("대댓글 삭제에 실패했습니다.");
+  }
+};
+
 // 기존 댓글들을 새로운 형식으로 마이그레이션 (관리자용)
 export const migrateComments = async () => {
   try {

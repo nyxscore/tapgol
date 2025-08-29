@@ -68,7 +68,7 @@ const Community = () => {
     // parkId를 문자열로 변환하여 일관성 보장
     const parkIdStr = String(parkId);
     // 해당 공원의 채팅방으로 이동
-    navigate(`/community/${parkIdStr}/chat`);
+            navigate(`/chat/park/${parkIdStr}`);
   };
 
   return (

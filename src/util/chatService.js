@@ -22,7 +22,7 @@ export const createChatMessage = async (messageData) => {
 };
 
 // 채팅 메시지 목록 조회 (실시간)
-export const subscribeToChatMessages = (callback, limitCount = 50) => {
+export const subscribeToChatMessages = (callback, limitCount = 100) => {
   try {
     const q = query(
       collection(db, "chatMessages"),
@@ -39,7 +39,8 @@ export const subscribeToChatMessages = (callback, limitCount = 50) => {
         });
       });
       // 최신 메시지가 아래에 오도록 역순으로 정렬
-      callback(messages.reverse());
+      const sortedMessages = messages.reverse();
+      callback(sortedMessages);
     });
   } catch (error) {
     console.error("채팅 메시지 구독 오류:", error);
