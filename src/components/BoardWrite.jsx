@@ -9,7 +9,7 @@ const BoardWrite = () => {
   const [form, setForm] = useState({
     title: "",
     content: "",
-    category: "일반"
+    category: "정기모임"
   });
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
@@ -31,7 +31,7 @@ const BoardWrite = () => {
         }
       } else {
         // 로그인되지 않은 경우 로그인 페이지로 리다이렉트
-        alert("글을 작성하려면 로그인이 필요합니다.");
+        alert("모임글을 작성하려면 로그인이 필요합니다.");
         navigate("/login");
         return;
       }
@@ -75,11 +75,11 @@ const BoardWrite = () => {
       };
 
       await createPost(postData);
-      alert("게시글이 성공적으로 작성되었습니다!");
+      alert("모임글이 성공적으로 작성되었습니다!");
       navigate("/board");
     } catch (error) {
       console.error("게시글 작성 오류:", error);
-      alert("게시글 작성 중 오류가 발생했습니다. 다시 시도해주세요.");
+      alert("모임글 작성 중 오류가 발생했습니다. 다시 시도해주세요.");
     } finally {
       setSubmitting(false);
     }
@@ -114,10 +114,10 @@ const BoardWrite = () => {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-amber-700 mb-2">
-                글쓰기
+                모임글쓰기
               </h1>
               <p className="text-gray-600">
-                탑골공원 이야기를 나누어보세요
+                탑골공원 모임과 활동을 함께 나누어보세요
               </p>
             </div>
             <div className="flex items-center space-x-2 text-sm text-gray-600">
@@ -143,11 +143,10 @@ const BoardWrite = () => {
                 onChange={handleInputChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
               >
-                <option value="일반">일반</option>
-                <option value="이벤트">이벤트</option>
-                <option value="건의사항">건의사항</option>
-                <option value="질문">질문</option>
-                <option value="후기">후기</option>
+                <option value="정기모임">정기모임</option>
+                <option value="벙개모임">벙개모임</option>
+                <option value="모임후기">모임후기</option>
+                <option value="모임건의사항">모임건의사항</option>
               </select>
             </div>
 
@@ -209,7 +208,7 @@ const BoardWrite = () => {
                     : "bg-amber-600 text-white hover:bg-amber-700"
                 }`}
               >
-                {submitting ? "작성 중..." : "글쓰기"}
+                {submitting ? "작성 중..." : "모임글쓰기"}
               </button>
             </div>
           </form>

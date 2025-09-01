@@ -10,7 +10,7 @@ const Banner = () => {
           <div className="mb-6 md:mb-0 md:mr-8">
             <div className="relative w-80 h-60 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl shadow-lg overflow-hidden">
               <img
-                src="../1.jpg"
+                src="/1.jpg"
                 alt="행복한 가족"
                 className="w-full h-full object-cover rounded-2xl"
                 onError={(e) => {

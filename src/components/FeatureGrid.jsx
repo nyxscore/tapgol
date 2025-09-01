@@ -7,31 +7,14 @@ const FeatureGrid = () => {
   const features = [
     {
       id: 1,
-      name: '게시판',
+      name: '모임게시판',
       icon: '📋',
       path: '/board'
     },
-    {
-      id: 2,
-      name: '동네모임',
-      icon: '👥',
-      path: '/community'
-    },
-    {
-      id: 3,
-      name: '놀이터',
-      icon: '🎮',
-      path: '/playground'
-    },
-    {
-      id: 4,
-      name: '탑골톡',
-      icon: '💬',
-      path: '/chat'
-    },
+
     {
       id: 5,
-      name: '갤러리',
+      name: '추억앨범',
       icon: '📸',
       path: '/gallery'
     },
@@ -41,12 +24,14 @@ const FeatureGrid = () => {
       icon: '🏥',
       path: '/health'
     },
+
     {
       id: 7,
-      name: '동창찾기',
-      icon: '🔍',
-      path: '/alumni-search'
+      name: '요리노하우',
+      icon: '👨‍🍳',
+      path: '/cooking'
     },
+
     {
       id: 8,
       name: '노래자랑',

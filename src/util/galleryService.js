@@ -64,7 +64,7 @@ export const uploadFile = async (file, userId) => {
   }
 };
 
-// 갤러리 항목 생성
+// 추억앨범 항목 생성
 export const createGalleryItem = async (galleryData) => {
   try {
     const itemWithTimestamp = {
@@ -78,12 +78,12 @@ export const createGalleryItem = async (galleryData) => {
     const docRef = await addDoc(collection(db, "gallery"), itemWithTimestamp);
     return { id: docRef.id, ...itemWithTimestamp };
   } catch (error) {
-    console.error("갤러리 항목 생성 오류:", error);
-    throw new Error("갤러리 항목 생성에 실패했습니다.");
+    console.error("추억앨범 항목 생성 오류:", error);
+    throw new Error("추억앨범 항목 생성에 실패했습니다.");
   }
 };
 
-// 갤러리 목록 조회
+// 추억앨범 목록 조회
 export const getGalleryItems = async (limitCount = 20) => {
   try {
     const q = query(
@@ -104,32 +104,41 @@ export const getGalleryItems = async (limitCount = 20) => {
     
     return items;
   } catch (error) {
-    console.error("갤러리 목록 조회 오류:", error);
-    throw new Error("갤러리 목록을 불러오는데 실패했습니다.");
+    console.error("추억앨범 목록 조회 오류:", error);
+    throw new Error("추억앨범 목록을 불러오는데 실패했습니다.");
   }
 };
 
-// 특정 갤러리 항목 조회
+// 특정 추억앨범 항목 조회
 export const getGalleryItem = async (itemId) => {
   try {
+    if (!itemId) {
+      throw new Error("추억앨범 항목 ID가 필요합니다.");
+    }
+
     const docRef = doc(db, "gallery", itemId);
     const docSnap = await getDoc(docRef);
     
     if (docSnap.exists()) {
+      const data = docSnap.data();
       return {
         id: docSnap.id,
-        ...docSnap.data()
+        ...data
       };
     } else {
-      throw new Error("갤러리 항목을 찾을 수 없습니다.");
+          console.error(`추억앨범 항목을 찾을 수 없습니다. ID: ${itemId}`);
+    throw new Error("추억앨범 항목을 찾을 수 없습니다.");
     }
   } catch (error) {
-    console.error("갤러리 항목 조회 오류:", error);
-    throw new Error("갤러리 항목을 불러오는데 실패했습니다.");
+    console.error("추억앨범 항목 조회 오류:", error);
+    if (error.message === "추억앨범 항목을 찾을 수 없습니다.") {
+      throw error; // 원래 에러 메시지 유지
+    }
+    throw new Error("추억앨범 항목을 불러오는데 실패했습니다.");
   }
 };
 
-// 갤러리 항목 수정
+// 추억앨범 항목 수정
 export const updateGalleryItem = async (itemId, updateData) => {
   try {
     const itemRef = doc(db, "gallery", itemId);
@@ -138,12 +147,12 @@ export const updateGalleryItem = async (itemId, updateData) => {
       updatedAt: serverTimestamp()
     });
   } catch (error) {
-    console.error("갤러리 항목 수정 오류:", error);
-    throw new Error("갤러리 항목 수정에 실패했습니다.");
+    console.error("추억앨범 항목 수정 오류:", error);
+    throw new Error("추억앨범 항목 수정에 실패했습니다.");
   }
 };
 
-// 갤러리 항목 삭제
+// 추억앨범 항목 삭제
 export const deleteGalleryItem = async (itemId, fileName) => {
   try {
     // Firestore 문서 삭제
@@ -156,8 +165,8 @@ export const deleteGalleryItem = async (itemId, fileName) => {
       await deleteObject(fileRef);
     }
   } catch (error) {
-    console.error("갤러리 항목 삭제 오류:", error);
-    throw new Error("갤러리 항목 삭제에 실패했습니다.");
+    console.error("추억앨범 항목 삭제 오류:", error);
+    throw new Error("추억앨범 항목 삭제에 실패했습니다.");
   }
 };
 
@@ -180,7 +189,7 @@ export const toggleLike = async (itemId, userId) => {
     const itemSnap = await getDoc(itemRef);
     
     if (!itemSnap.exists()) {
-      throw new Error("갤러리 항목을 찾을 수 없습니다.");
+      throw new Error("추억앨범 항목을 찾을 수 없습니다.");
     }
     
     const itemData = itemSnap.data();
@@ -208,7 +217,7 @@ export const toggleLike = async (itemId, userId) => {
   }
 };
 
-// 사용자별 갤러리 항목 조회
+// 사용자별 추억앨범 항목 조회
 export const getGalleryItemsByUser = async (userId) => {
   try {
     const q = query(
@@ -229,8 +238,8 @@ export const getGalleryItemsByUser = async (userId) => {
     
     return items;
   } catch (error) {
-    console.error("사용자 갤러리 조회 오류:", error);
-    throw new Error("사용자 갤러리를 불러오는데 실패했습니다.");
+    console.error("사용자 추억앨범 조회 오류:", error);
+    throw new Error("사용자 추억앨범을 불러오는데 실패했습니다.");
   }
 };
 

@@ -7,8 +7,14 @@ import { db } from "./firebase";
 // 채팅 메시지 작성
 export const createChatMessage = async (messageData) => {
   try {
-    const messageWithTimestamp = {
+    // authorName이 없으면 author로 설정 (기존 메시지와의 호환성)
+    const messageWithDefaults = {
       ...messageData,
+      authorName: messageData.authorName || messageData.author || "익명"
+    };
+    
+    const messageWithTimestamp = {
+      ...messageWithDefaults,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
@@ -33,13 +39,37 @@ export const subscribeToChatMessages = (callback, limitCount = 100) => {
     return onSnapshot(q, (querySnapshot) => {
       const messages = [];
       querySnapshot.forEach((doc) => {
-        messages.push({
+        const messageData = {
           id: doc.id,
           ...doc.data()
-        });
+        };
+        
+        // 모든 메시지를 포함하되, 작성자 정보 상태를 로깅
+        messages.push(messageData);
+        
+        // 작성자 정보 상태 로깅 (authorId만 있으면 정상)
+        if (!messageData.authorId) {
+          console.log("작성자 ID가 없는 메시지:", {
+            id: messageData.id,
+            content: messageData.content?.substring(0, 20) + "...",
+            authorId: messageData.authorId,
+            authorName: messageData.authorName,
+            author: messageData.author,
+            userId: messageData.userId
+          });
+        }
       });
-      // 최신 메시지가 아래에 오도록 역순으로 정렬
+      
+      // 최신 메시지가 아래에 오도록 역순으로 정렬 (Firestore desc → 오래된 메시지부터)
       const sortedMessages = messages.reverse();
+      
+      console.log("메인 채팅 메시지 정렬 후 (필터링됨):", sortedMessages.map(m => ({
+        id: m.id,
+        content: m.content?.substring(0, 20) + "...",
+        authorName: m.authorName,
+        time: m.createdAt?.toDate ? m.createdAt.toDate().toLocaleTimeString() : "시간없음"
+      })));
+      
       callback(sortedMessages);
     });
   } catch (error) {

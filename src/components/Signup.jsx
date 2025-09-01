@@ -7,6 +7,7 @@ import { auth, db } from "../util/firebase";
 const Signup = () => {
   const [form, setForm] = useState({
     id: "",
+    email: "",
     password: "",
     passwordConfirm: "",
     phone: "",
@@ -84,6 +85,16 @@ const Signup = () => {
       errors.id = "아이디는 영문, 숫자, 한글만 사용 가능합니다.";
     }
 
+    // 이메일 검증
+    if (!form.email.trim()) {
+      errors.email = "이메일을 입력해주세요.";
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(form.email)) {
+        errors.email = "올바른 이메일 형식을 입력해주세요.";
+      }
+    }
+
     // 비밀번호 검증
     if (!form.password) {
       errors.password = "비밀번호를 입력해주세요.";
@@ -143,7 +154,7 @@ const Signup = () => {
       // Firebase에 사용자 계정 생성
       const userCredential = await createUserWithEmailAndPassword(
         auth,
-        form.id + "@tapgol.com",
+        form.email,
         form.password
       );
 
@@ -159,7 +170,7 @@ const Signup = () => {
         name: form.name,
         nickname: form.nickname,
         phone: form.phone,
-        email: form.id + "@tapgol.com",
+        email: form.email,
         birthDate: form.birthDate || null,
         gender: form.gender || null,
         address: form.address || null,
@@ -295,6 +306,25 @@ const Signup = () => {
               {fieldErrors.id && <p className="text-sm text-red-500 mt-1">{fieldErrors.id}</p>}
             </div>
             
+            <div>
+              <label className="block text-lg font-semibold mb-2" htmlFor="email">
+                이메일 *
+              </label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={form.email}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-amber-400 ${getFieldErrorStyle("email")}`}
+                required
+                placeholder="example@gmail.com"
+              />
+              {fieldErrors.email && <p className="text-sm text-red-500 mt-1">{fieldErrors.email}</p>}
+            </div>
+          </div>
+
+          <div className="mt-4">
             <div>
               <label className="block text-lg font-semibold mb-2" htmlFor="nickname">
                 별명 *

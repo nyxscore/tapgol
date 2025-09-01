@@ -202,24 +202,31 @@ const HealthBoard = () => {
                   onClick={() => handlePostClick(post.id)}
                   className="bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-shadow"
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-3">
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-3">
                       <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getCategoryColor(post.category)}`}>
                         {post.category}
                       </span>
-                      <span className="text-sm text-gray-500">{formatDate(post.createdAt)}</span>
                     </div>
-                    <div className="flex items-center space-x-4 text-sm text-gray-500">
-                      <div className="flex items-center space-x-1">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                          <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                        </svg>
-                        <span>{post.views || 0}</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                      <div className="flex flex-col">
+                        <span className="text-gray-500 text-xs mb-1">작성자</span>
+                        <span className="font-medium text-gray-800">{post.author}</span>
                       </div>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
+                      <div className="flex flex-col">
+                        <span className="text-gray-500 text-xs mb-1">작성일</span>
+                        <span className="text-gray-600">{formatDate(post.createdAt)}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-gray-500 text-xs mb-1">조회수</span>
+                        <div className="flex items-center space-x-1">
+                          <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                            <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-gray-600">{post.views || 0}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   
@@ -232,8 +239,8 @@ const HealthBoard = () => {
                   </p>
                   
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-gray-800">{post.author}</span>
-                    <div className="flex items-center space-x-3">
+                    <div className="flex flex-col">
+                      <span className="text-gray-500 text-xs mb-1">좋아요</span>
                       <button
                         onClick={(e) => handleLike(e, post.id)}
                         className={`flex items-center space-x-1 transition-colors ${
@@ -243,12 +250,12 @@ const HealthBoard = () => {
                         <svg className="w-4 h-4" fill={isLikedByUser(post) ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                         </svg>
-                        <span>{post.likes || 0}</span>
+                        <span className={isLikedByUser(post) ? "text-red-500 font-semibold" : ""}>{post.likes || 0}</span>
                       </button>
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
                     </div>
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
                   </div>
                 </div>
               ))}

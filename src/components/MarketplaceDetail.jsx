@@ -8,8 +8,10 @@ import CommentSection from './CommentSection';
 const MarketplaceDetail = () => {
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [imageError, setImageError] = useState({});
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -25,28 +27,35 @@ const MarketplaceDetail = () => {
   ];
 
   useEffect(() => {
-    loadPost();
+    if (id) {
+      loadPost();
+    }
   }, [id]);
 
   const loadPost = async () => {
     try {
       setLoading(true);
+      setError(null);
       const postData = await getMarketplacePost(id);
       setPost(postData);
       
       // 조회수 증가
-      await incrementViews(id);
+      try {
+        await incrementViews(id);
+      } catch (viewError) {
+        console.error('조회수 증가 오류:', viewError);
+        // 조회수 증가 실패는 무시하고 계속 진행
+      }
     } catch (error) {
       console.error('상품 로딩 오류:', error);
-      alert('상품을 불러오는데 실패했습니다.');
-      navigate('/marketplace');
+      setError('상품을 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!user || post.authorId !== user.uid) {
+    if (!user || !post || post.authorId !== user.uid) {
       alert('삭제 권한이 없습니다.');
       return;
     }
@@ -62,7 +71,7 @@ const MarketplaceDetail = () => {
   };
 
   const handleMarkAsSold = async () => {
-    if (!user || post.authorId !== user.uid) {
+    if (!user || !post || post.authorId !== user.uid) {
       alert('권한이 없습니다.');
       return;
     }
@@ -78,25 +87,35 @@ const MarketplaceDetail = () => {
   };
 
   const formatPrice = (price) => {
-    return price ? `${price.toLocaleString()}원` : '가격협의';
+    if (!price || isNaN(price)) return '가격협의';
+    return `${price.toLocaleString()}원`;
   };
 
   const formatDate = (timestamp) => {
     if (!timestamp) return '';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString('ko-KR');
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleDateString('ko-KR');
+    } catch (error) {
+      console.error('날짜 포맷 오류:', error);
+      return '';
+    }
   };
 
   const nextImage = () => {
-    if (post.images && post.images.length > 1) {
+    if (post?.images && post.images.length > 1) {
       setCurrentImageIndex((prev) => (prev + 1) % post.images.length);
     }
   };
 
   const prevImage = () => {
-    if (post.images && post.images.length > 1) {
+    if (post?.images && post.images.length > 1) {
       setCurrentImageIndex((prev) => (prev - 1 + post.images.length) % post.images.length);
     }
+  };
+
+  const handleImageError = (imageIndex) => {
+    setImageError(prev => ({ ...prev, [imageIndex]: true }));
   };
 
   if (loading) {
@@ -110,11 +129,19 @@ const MarketplaceDetail = () => {
     );
   }
 
-  if (!post) {
+  if (error || !post) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600">상품을 찾을 수 없습니다.</p>
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h3 className="text-xl font-semibold text-gray-700 mb-2">상품을 찾을 수 없습니다</h3>
+          <p className="text-gray-500 mb-6">{error || '존재하지 않는 상품입니다.'}</p>
+          <button
+            onClick={() => navigate('/marketplace')}
+            className="px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+          >
+            중고장터로 돌아가기
+          </button>
         </div>
       </div>
     );
@@ -124,208 +151,206 @@ const MarketplaceDetail = () => {
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* 헤더 */}
-        <div className="flex items-center justify-between mb-6">
-          <button
-            onClick={() => navigate('/marketplace')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-800"
-          >
-            <FaArrowLeft />
-            목록으로
-          </button>
-          {user && post.authorId === user.uid && (
-            <div className="flex gap-2">
-              <button
-                onClick={() => navigate(`/marketplace/edit/${id}`)}
-                className="flex items-center gap-1 px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
-              >
-                <FaEdit />
-                수정
-              </button>
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="flex items-center gap-1 px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
-              >
-                <FaTrash />
-                삭제
-              </button>
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => navigate('/marketplace')}
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              <FaArrowLeft />
+              목록으로
+            </button>
+            {user && post.authorId === user.uid && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => navigate(`/marketplace/edit/${id}`)}
+                  className="flex items-center gap-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm"
+                >
+                  <FaEdit />
+                  수정
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="flex items-center gap-2 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-sm"
+                >
+                  <FaTrash />
+                  삭제
+                </button>
+              </div>
+            )}
+          </div>
+          
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">{post.title || '제목 없음'}</h1>
+          <p className="text-amber-600 font-bold text-2xl mb-4">{formatPrice(post.price)}</p>
+          
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm mb-4">
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-xs mb-1">위치</span>
+              <span className="text-gray-600">{post.location || '위치 미설정'}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-xs mb-1">등록일</span>
+              <span className="text-gray-600">{formatDate(post.createdAt)}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-xs mb-1">조회수</span>
+              <div className="flex items-center space-x-1">
+                <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                  <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                </svg>
+                <span className="text-gray-600">{post.views || 0}</span>
+              </div>
+            </div>
+          </div>
+          
+          {post.category && (
+            <div className="mb-4">
+              <span className="inline-block bg-gray-100 text-gray-600 px-3 py-1 rounded text-sm">
+                {categories.find(c => c.value === post.category)?.label || post.category}
+              </span>
             </div>
           )}
         </div>
 
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          {/* 이미지 슬라이더 */}
-          <div className="relative aspect-video bg-gray-200">
-            {post.images && post.images.length > 0 ? (
-              <>
-                <img
-                  src={post.images[currentImageIndex]}
-                  alt={post.title}
-                  className="w-full h-full object-cover"
-                />
+        {/* 이미지 갤러리 */}
+        {post.images && post.images.length > 0 && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div className="relative">
+              <div className="aspect-video bg-gray-200 rounded-lg overflow-hidden relative">
+                {!imageError[currentImageIndex] ? (
+                  <img
+                    src={post.images[currentImageIndex]}
+                    alt={`${post.title} 이미지 ${currentImageIndex + 1}`}
+                    className="w-full h-full object-cover"
+                    onError={() => handleImageError(currentImageIndex)}
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    <span className="text-6xl">📷</span>
+                  </div>
+                )}
+                
                 {post.images.length > 1 && (
                   <>
                     <button
                       onClick={prevImage}
-                      className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70"
+                      className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-colors"
                     >
                       ‹
                     </button>
                     <button
                       onClick={nextImage}
-                      className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70"
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-colors"
                     >
                       ›
                     </button>
-                    <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
-                      {currentImageIndex + 1} / {post.images.length}
-                    </div>
                   </>
                 )}
-              </>
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                <span className="text-6xl">📷</span>
               </div>
-            )}
-            {post.sold && (
-              <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded text-sm font-semibold">
-                판매완료
-              </div>
-            )}
-          </div>
-
-          {/* 썸네일 이미지들 */}
-          {post.images && post.images.length > 1 && (
-            <div className="p-4 border-b">
-              <div className="flex gap-2 overflow-x-auto">
-                {post.images.map((image, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentImageIndex(index)}
-                    className={`flex-shrink-0 w-16 h-16 rounded border-2 ${
-                      index === currentImageIndex ? 'border-amber-500' : 'border-gray-300'
-                    }`}
-                  >
-                    <img
-                      src={image}
-                      alt={`썸네일 ${index + 1}`}
-                      className="w-full h-full object-cover rounded"
+              
+              {post.images.length > 1 && (
+                <div className="flex justify-center mt-4 gap-2">
+                  {post.images.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentImageIndex(index)}
+                      className={`w-3 h-3 rounded-full ${
+                        index === currentImageIndex ? 'bg-amber-600' : 'bg-gray-300'
+                      }`}
                     />
-                  </button>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* 상품 정보 */}
-          <div className="p-6">
-            <div className="flex items-start justify-between mb-4">
+        {/* 상품 설명 */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">상품 설명</h2>
+          <div className="prose max-w-none">
+            <p className="text-gray-700 whitespace-pre-wrap">
+              {post.description || '상품 설명이 없습니다.'}
+            </p>
+          </div>
+        </div>
+
+        {/* 판매자 정보 */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">판매자 정보</h2>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-gray-800">{post.author || '익명'}</p>
+              <p className="text-sm text-gray-500">{post.location || '위치 미설정'}</p>
+            </div>
+            <div className="flex gap-2">
+              <button className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors">
+                <FaPhone />
+                연락하기
+              </button>
+              <button className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+                <FaComment />
+                채팅
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 판매 상태 변경 */}
+        {user && post.authorId === user.uid && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-gray-800 mb-2">{post.title}</h1>
-                <p className="text-3xl font-bold text-amber-600 mb-2">
-                  {formatPrice(post.price)}
+                <h2 className="text-xl font-semibold text-gray-800 mb-2">판매 상태</h2>
+                <p className="text-gray-600">
+                  현재 상태: {post.sold ? '판매완료' : '판매중'}
                 </p>
               </div>
-              <div className="flex gap-2">
-                <button className="p-2 text-gray-400 hover:text-red-500">
-                  <FaHeart />
-                </button>
-                <button className="p-2 text-gray-400 hover:text-blue-500">
-                  <FaShare />
-                </button>
-              </div>
+              <button
+                onClick={handleMarkAsSold}
+                className={`px-6 py-2 rounded transition-colors ${
+                  post.sold
+                    ? 'bg-blue-500 text-white hover:bg-blue-600'
+                    : 'bg-red-500 text-white hover:bg-red-600'
+                }`}
+              >
+                {post.sold ? '판매중으로 변경' : '판매완료로 변경'}
+              </button>
             </div>
-
-            {/* 카테고리 및 위치 */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              {post.category && (
-                <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-sm">
-                  {categories.find(c => c.value === post.category)?.label || post.category}
-                </span>
-              )}
-              {post.location && (
-                <span className="bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-sm">
-                  📍 {post.location}
-                </span>
-              )}
-            </div>
-
-            {/* 판매자 정보 */}
-            <div className="bg-gray-50 rounded-lg p-4 mb-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-gray-800">{post.authorName}</p>
-                  <p className="text-sm text-gray-500">등록일: {formatDate(post.createdAt)}</p>
-                  <p className="text-sm text-gray-500">조회수: {post.views || 0}</p>
-                </div>
-                <div className="flex gap-2">
-                  <button className="flex items-center gap-1 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">
-                    <FaPhone />
-                    연락하기
-                  </button>
-                  <button className="flex items-center gap-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-                    <FaComment />
-                    채팅하기
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* 상품 설명 */}
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">상품 설명</h3>
-              <div className="text-gray-700 whitespace-pre-wrap">
-                {post.description}
-              </div>
-            </div>
-
-            {/* 판매 상태 변경 (판매자만) */}
-            {user && post.authorId === user.uid && (
-              <div className="mb-6">
-                <button
-                  onClick={handleMarkAsSold}
-                  className={`w-full py-3 rounded-lg font-semibold ${
-                    post.sold
-                      ? 'bg-green-500 text-white hover:bg-green-600'
-                      : 'bg-red-500 text-white hover:bg-red-600'
-                  }`}
-                >
-                  {post.sold ? '판매 중으로 변경' : '판매완료로 변경'}
-                </button>
-              </div>
-            )}
           </div>
-        </div>
+        )}
 
         {/* 댓글 섹션 */}
-        <div className="mt-6">
-          <CommentSection postId={id} boardType="marketplace" />
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <CommentSection postId={id} postType="marketplace" />
         </div>
-      </div>
 
-      {/* 삭제 확인 모달 */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm mx-4">
-            <h3 className="text-lg font-semibold mb-4">상품 삭제</h3>
-            <p className="text-gray-600 mb-6">정말로 이 상품을 삭제하시겠습니까?</p>
-            <div className="flex gap-4">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleDelete}
-                className="flex-1 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-              >
-                삭제
-              </button>
+        {/* 삭제 확인 모달 */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <h3 className="text-xl font-semibold text-gray-800 mb-4">상품 삭제</h3>
+              <p className="text-gray-600 mb-6">정말로 이 상품을 삭제하시겠습니까?</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleDelete}
+                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                >
+                  삭제
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                >
+                  취소
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

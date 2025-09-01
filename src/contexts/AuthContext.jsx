@@ -17,6 +17,7 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [lastActivity, setLastActivity] = useState(Date.now());
 
   useEffect(() => {
     // 세션 지속성을 브라우저 세션으로 설정 (탭/창을 닫으면 로그아웃)
@@ -25,38 +26,69 @@ export const AuthProvider = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
-    });
-
-    // 페이지를 떠날 때 로그아웃 처리
-    const handleBeforeUnload = () => {
       if (user) {
-        signOut(auth);
+        setLastActivity(Date.now());
       }
-    };
-
-    // 페이지 가시성 변경 시 로그아웃 처리 (탭 전환, 앱 최소화 등)
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden' && user) {
-        // 페이지가 숨겨질 때 로그아웃
-        signOut(auth);
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    });
 
     return () => {
       unsubscribe();
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [user]);
+  }, []);
+
+  // 사용자 활동 감지 및 자동 로그아웃 처리
+  useEffect(() => {
+    if (!user) return;
+
+    // 사용자 활동을 감지하는 이벤트들
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    const updateActivity = () => {
+      setLastActivity(Date.now());
+    };
+
+    // 모든 활동 이벤트 리스너 등록
+    activityEvents.forEach(event => {
+      document.addEventListener(event, updateActivity, true);
+    });
+
+    // 10분(600,000ms) 비활성 체크 타이머
+    const inactivityTimer = setInterval(() => {
+      const now = Date.now();
+      const timeSinceLastActivity = now - lastActivity;
+      const tenMinutes = 10 * 60 * 1000; // 10분
+
+      if (timeSinceLastActivity >= tenMinutes) {
+        console.log('10분 비활성으로 인한 자동 로그아웃');
+        signOut(auth);
+      }
+    }, 60000); // 1분마다 체크
+
+    return () => {
+      // 모든 이벤트 리스너 제거
+      activityEvents.forEach(event => {
+        document.removeEventListener(event, updateActivity, true);
+      });
+      clearInterval(inactivityTimer);
+    };
+  }, [user, lastActivity]);
 
   const login = async (email, password) => {
     try {
+      console.log("AuthContext login 시도:", { email, passwordLength: password?.length });
+      console.log("Firebase Auth 인스턴스:", auth);
+      console.log("Auth 도메인:", auth.config.authDomain);
+      
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log("AuthContext 로그인 성공:", userCredential.user.email);
       return userCredential.user;
     } catch (error) {
+      console.error("AuthContext 로그인 오류:", error);
+      console.error("오류 상세:", {
+        code: error.code,
+        message: error.message,
+        email: email
+      });
       throw error;
     }
   };

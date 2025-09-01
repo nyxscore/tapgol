@@ -22,7 +22,7 @@ const BottomNavigation = () => {
   }, []);
 
   useEffect(() => {
-    // 읽지 않은 채팅 알림 개수 구독
+    // 로그인된 사용자만 읽지 않은 채팅 알림 개수 구독
     if (user) {
       try {
         chatNotificationUnsubscribeRef.current = subscribeToUnreadChatCount((count) => {
@@ -31,6 +31,9 @@ const BottomNavigation = () => {
       } catch (error) {
         console.error("채팅 알림 개수 구독 오류:", error);
       }
+    } else {
+      // 로그아웃 시 알림 개수 초기화
+      setUnreadChatCount(0);
     }
 
     return () => {
@@ -54,13 +57,13 @@ const BottomNavigation = () => {
     {
       id: 1,
       name: "탑골톡",
-              path: "/chat",
+      path: "/chat/main",
       icon: (
         <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
         </svg>
       ),
-      badge: unreadChatCount > 0 ? unreadChatCount : null
+      badge: user && unreadChatCount > 0 ? unreadChatCount : null
     },
     {
       id: 2,

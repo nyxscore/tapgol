@@ -216,29 +216,36 @@ const HealthDetail = () => {
             <h1 className="text-2xl font-bold text-gray-800 mb-3">
               {post.title}
             </h1>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4 text-sm text-gray-600">
-                <span className="font-medium">{post.author}</span>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+              <div className="flex flex-col">
+                <span className="text-gray-500 text-xs mb-1">작성자</span>
+                <span className="font-medium text-gray-800">{post.author}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-gray-500 text-xs mb-1">조회수</span>
                 <div className="flex items-center space-x-1">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
                     <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
                   </svg>
-                  <span>{post.views || 0}</span>
+                  <span className="text-gray-600">{post.views || 0}</span>
                 </div>
               </div>
-              <button
-                onClick={handleLike}
-                disabled={liking}
-                className={`flex items-center space-x-1 transition-colors ${
-                  isLiked ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
-                }`}
-              >
-                <svg className="w-5 h-5" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-                <span>{post.likes || 0}</span>
-              </button>
+              <div className="flex flex-col">
+                <span className="text-gray-500 text-xs mb-1">좋아요</span>
+                <button
+                  onClick={handleLike}
+                  disabled={liking}
+                  className={`flex items-center space-x-1 transition-colors ${
+                    isLiked ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  <span className={isLiked ? "text-red-500 font-semibold" : "text-gray-600"}>{post.likes || 0}</span>
+                </button>
+              </div>
             </div>
           </div>
 

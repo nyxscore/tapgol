@@ -21,39 +21,6 @@ const GalleryDetail = () => {
       setUser(currentUser);
     });
 
-    const loadItem = async () => {
-      try {
-        const itemData = await getGalleryItem(id);
-        setItem(itemData);
-        
-        // 조회수 증가 (로그인한 사용자만)
-        if (user) {
-          await incrementViews(id);
-          
-          // 이 갤러리 항목과 관련된 알림을 읽음 처리
-          try {
-            const processedCount = await markNotificationsByPostIdAsRead(id, "gallery");
-            if (processedCount > 0) {
-              console.log(`${processedCount}개의 갤러리 관련 알림이 읽음 처리되었습니다.`);
-            }
-          } catch (notificationError) {
-            console.error("알림 읽음 처리 오류:", notificationError);
-            // 알림 처리 실패는 갤러리 보기에 영향을 주지 않도록 함
-          }
-        }
-      } catch (error) {
-        console.error("갤러리 항목 로드 오류:", error);
-        alert("갤러리 항목을 불러오는데 실패했습니다.");
-        navigate("/gallery");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (id) {
-      loadItem();
-    }
-
     return () => {
       unsubscribe();
       // 컴포넌트 언마운트 시 비디오 정리
@@ -70,7 +37,72 @@ const GalleryDetail = () => {
         }
       }
     };
-  }, [id, user, navigate]);
+  }, []);
+
+  // 갤러리 항목 로드 (id가 변경될 때만)
+  useEffect(() => {
+    const loadItem = async () => {
+      if (!id) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        setLoading(true);
+        console.log(`갤러리 항목 로드 시도: ${id}`);
+        const itemData = await getGalleryItem(id);
+        console.log("갤러리 항목 로드 성공:", itemData);
+        setItem(itemData);
+      } catch (error) {
+        console.error("갤러리 항목 로드 오류:", error);
+        setItem(null);
+        
+        // 사용자에게 더 친화적인 메시지 표시
+        if (error.message === "갤러리 항목을 찾을 수 없습니다.") {
+          alert("요청하신 갤러리 항목을 찾을 수 없습니다. 삭제되었거나 잘못된 링크일 수 있습니다.");
+        } else {
+          alert("갤러리 항목을 불러오는데 실패했습니다. 잠시 후 다시 시도해주세요.");
+        }
+        
+        // 2초 후 갤러리로 이동
+        setTimeout(() => {
+          navigate("/gallery");
+        }, 2000);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadItem();
+  }, [id, navigate]);
+
+  // 조회수 증가 및 알림 처리 (user가 로그인한 후)
+  useEffect(() => {
+    const handleUserActions = async () => {
+      if (!user || !item) return;
+      
+      try {
+        // 조회수 증가
+        await incrementViews(id);
+        
+        // 이 갤러리 항목과 관련된 알림을 읽음 처리
+        try {
+          const processedCount = await markNotificationsByPostIdAsRead(id, "gallery");
+          if (processedCount > 0) {
+            console.log(`${processedCount}개의 갤러리 관련 알림이 읽음 처리되었습니다.`);
+          }
+        } catch (notificationError) {
+          console.error("알림 읽음 처리 오류:", notificationError);
+          // 알림 처리 실패는 갤러리 보기에 영향을 주지 않도록 함
+        }
+      } catch (error) {
+        console.error("사용자 액션 처리 오류:", error);
+        // 조회수 증가 실패는 갤러리 보기에 영향을 주지 않도록 함
+      }
+    };
+
+    handleUserActions();
+  }, [user, item, id]);
 
   const formatDate = (timestamp) => {
     if (!timestamp) return "";
@@ -160,17 +192,18 @@ const GalleryDetail = () => {
     );
   }
 
-  if (!item) {
+  if (!item && !loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center">
         <div className="text-center">
           <div className="text-gray-400 text-6xl mb-4">📄</div>
-          <p className="text-gray-600 text-lg mb-2">갤러리 항목을 찾을 수 없습니다</p>
+                        <p className="text-gray-600 text-lg mb-2">추억앨범 항목을 찾을 수 없습니다</p>
+          <p className="text-gray-500 text-sm mb-4">삭제되었거나 잘못된 링크일 수 있습니다.</p>
           <button
             onClick={() => navigate("/gallery")}
             className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors"
           >
-            갤러리로 돌아가기
+            추억앨범으로 돌아가기
           </button>
         </div>
       </div>
@@ -190,9 +223,9 @@ const GalleryDetail = () => {
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              갤러리로 돌아가기
+              추억앨범으로 돌아가기
             </button>
-            <h1 className="text-2xl font-bold text-gray-800">갤러리 상세</h1>
+            <h1 className="text-2xl font-bold text-gray-800">추억앨범 상세</h1>
             <div className="w-24"></div>
           </div>
         </div>
@@ -220,17 +253,30 @@ const GalleryDetail = () => {
               )}
             </div>
             
-            <div className="flex items-center justify-between text-sm text-gray-600">
-              <div className="flex items-center space-x-4">
-                <span>업로더: <span className="font-semibold">{item.uploader}</span></span>
-                <span>업로드일: {formatDate(item.createdAt)}</span>
-                {item.updatedAt && item.updatedAt !== item.createdAt && (
-                  <span>수정일: {formatDate(item.updatedAt)}</span>
-                )}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+              <div className="flex flex-col">
+                <span className="text-gray-500 text-xs mb-1">업로더</span>
+                <span className="font-medium text-gray-800">{item.uploader}</span>
               </div>
-              <div className="flex items-center space-x-4">
-                <span>조회수: {item.views || 0}</span>
-                <span>좋아요: {item.likes || 0}</span>
+              <div className="flex flex-col">
+                <span className="text-gray-500 text-xs mb-1">업로드일</span>
+                <span className="text-gray-600">{formatDate(item.createdAt)}</span>
+              </div>
+              {item.updatedAt && item.updatedAt !== item.createdAt && (
+                <div className="flex flex-col">
+                  <span className="text-gray-500 text-xs mb-1">수정일</span>
+                  <span className="text-gray-600">{formatDate(item.updatedAt)}</span>
+                </div>
+              )}
+              <div className="flex flex-col">
+                <span className="text-gray-500 text-xs mb-1">조회수</span>
+                <div className="flex items-center space-x-1">
+                  <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-gray-600">{item.views || 0}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -244,6 +290,7 @@ const GalleryDetail = () => {
                   alt={item.title}
                   className="max-w-full h-auto rounded-lg shadow-lg mx-auto"
                   style={{ maxHeight: '70vh' }}
+                  loading="lazy"
                 />
               </div>
             ) : (
@@ -251,8 +298,20 @@ const GalleryDetail = () => {
                 <video
                   src={item.fileUrl}
                   controls
+                  preload="metadata"
+                  poster=""
                   className="max-w-full h-auto rounded-lg shadow-lg mx-auto"
                   style={{ maxHeight: '70vh' }}
+                  onLoadedMetadata={(e) => {
+                    // 동영상 메타데이터 로드 후 첫 번째 프레임을 썸네일로 사용
+                    const video = e.target;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    video.poster = canvas.toDataURL();
+                  }}
                 >
                   브라우저가 비디오를 지원하지 않습니다.
                 </video>

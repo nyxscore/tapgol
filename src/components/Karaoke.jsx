@@ -176,29 +176,58 @@ const Karaoke = () => {
                   className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transform transition-transform hover:scale-105 hover:shadow-lg"
                 >
                   <div className="relative">
-                    <video
-                      src={post.videoUrl}
-                      className="w-full h-48 object-cover"
-                      muted
-                      onMouseOver={async (e) => {
-                        try {
-                          await e.target.play();
-                        } catch (error) {
-                          // AbortError는 무시 (사용자가 빠르게 마우스를 움직일 때 발생)
-                          if (error.name !== 'AbortError') {
-                            console.error('비디오 재생 오류:', error);
+                    <div className="w-full h-48 bg-gray-200 flex items-center justify-center relative overflow-hidden">
+                      <video
+                        src={post.videoUrl}
+                        className="w-full h-full object-cover"
+                        muted
+                        preload="metadata"
+                        poster=""
+                        onLoadedMetadata={(e) => {
+                          // 동영상 메타데이터 로드 후 첫 번째 프레임을 썸네일로 사용
+                          const video = e.target;
+                          const canvas = document.createElement('canvas');
+                          canvas.width = video.videoWidth;
+                          canvas.height = video.videoHeight;
+                          const ctx = canvas.getContext('2d');
+                          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                          video.style.backgroundImage = `url(${canvas.toDataURL()})`;
+                          video.style.backgroundSize = 'cover';
+                          video.style.backgroundPosition = 'center';
+                        }}
+                        onMouseOver={async (e) => {
+                          try {
+                            await e.target.play();
+                          } catch (error) {
+                            // AbortError는 무시 (사용자가 빠르게 마우스를 움직일 때 발생)
+                            if (error.name !== 'AbortError') {
+                              console.error('비디오 재생 오류:', error);
+                            }
                           }
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        try {
-                          e.target.pause();
-                          e.target.currentTime = 0;
-                        } catch (error) {
-                          console.error('비디오 일시정지 오류:', error);
-                        }
-                      }}
-                    />
+                        }}
+                        onMouseOut={(e) => {
+                          try {
+                            e.target.pause();
+                            e.target.currentTime = 0;
+                          } catch (error) {
+                            console.error('비디오 일시정지 오류:', error);
+                          }
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
+                        <div className="bg-white bg-opacity-20 rounded-full p-3 backdrop-blur-sm">
+                          <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded flex items-center space-x-1">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+                        </svg>
+                        <span>노래자랑</span>
+                      </div>
+                    </div>
                     <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded flex items-center space-x-1">
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
@@ -211,9 +240,13 @@ const Karaoke = () => {
                     {post.description && (
                       <p className="text-sm text-gray-600 mb-3 line-clamp-2">{post.description}</p>
                     )}
-                    <div className="flex items-center justify-between text-sm text-gray-500">
-                      <span className="font-medium">{post.author}</span>
-                      <div className="flex items-center space-x-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                      <div className="flex flex-col">
+                        <span className="text-gray-500 text-xs mb-1">작성자</span>
+                        <span className="font-medium text-gray-800">{post.author}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-gray-500 text-xs mb-1">좋아요</span>
                         <button
                           onClick={(e) => handleLike(e, post.id)}
                           className={`flex items-center space-x-1 transition-colors ${
@@ -223,14 +256,17 @@ const Karaoke = () => {
                           <svg className="w-4 h-4" fill={isLikedByUser(post) ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                           </svg>
-                          <span>{post.likes || 0}</span>
+                          <span className={isLikedByUser(post) ? "text-red-500 font-semibold" : "text-gray-600"}>{post.likes || 0}</span>
                         </button>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-gray-500 text-xs mb-1">조회수</span>
                         <div className="flex items-center space-x-1">
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
                             <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
                           </svg>
-                          <span>{post.views || 0}</span>
+                          <span className="text-gray-600">{post.views || 0}</span>
                         </div>
                       </div>
                     </div>

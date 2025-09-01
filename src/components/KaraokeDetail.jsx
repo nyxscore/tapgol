@@ -210,8 +210,19 @@ const KaraokeDetail = () => {
               <video
                 src={post.videoUrl}
                 controls
+                preload="metadata"
+                poster=""
                 className="w-full h-full object-contain"
-                poster={post.thumbnailUrl}
+                onLoadedMetadata={(e) => {
+                  // 동영상 메타데이터 로드 후 첫 번째 프레임을 썸네일로 사용
+                  const video = e.target;
+                  const canvas = document.createElement('canvas');
+                  canvas.width = video.videoWidth;
+                  canvas.height = video.videoHeight;
+                  const ctx = canvas.getContext('2d');
+                  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                  video.poster = canvas.toDataURL();
+                }}
               >
                 브라우저가 비디오 태그를 지원하지 않습니다.
               </video>
@@ -223,12 +234,25 @@ const KaraokeDetail = () => {
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
                 <h1 className="text-2xl font-bold text-gray-800 mb-2">{post.title}</h1>
-                <div className="flex items-center space-x-4 text-sm text-gray-500 mb-3">
-                  <span>{post.author}</span>
-                  <span>•</span>
-                  <span>{formatDate(post.createdAt)}</span>
-                  <span>•</span>
-                  <span>조회 {post.views || 0}</span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm mb-3">
+                  <div className="flex flex-col">
+                    <span className="text-gray-500 text-xs mb-1">작성자</span>
+                    <span className="font-medium text-gray-800">{post.author}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-gray-500 text-xs mb-1">업로드일</span>
+                    <span className="text-gray-600">{formatDate(post.createdAt)}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-gray-500 text-xs mb-1">조회수</span>
+                    <div className="flex items-center space-x-1">
+                      <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                        <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-gray-600">{post.views || 0}</span>
+                    </div>
+                  </div>
                 </div>
                 {post.description && (
                   <div className="text-gray-700 whitespace-pre-wrap">

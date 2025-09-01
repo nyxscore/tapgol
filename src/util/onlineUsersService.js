@@ -40,10 +40,25 @@ export const addOnlineUser = async (userData) => {
 export const updateOnlineUser = async (userId, updateData) => {
   try {
     const userRef = doc(db, "onlineUsers", userId);
-    await updateDoc(userRef, {
-      ...updateData,
-      lastSeen: serverTimestamp()
-    });
+    
+    // 문서가 존재하는지 먼저 확인
+    const userDoc = await getDoc(userRef);
+    
+    if (userDoc.exists()) {
+      // 문서가 존재하면 업데이트
+      await updateDoc(userRef, {
+        ...updateData,
+        lastSeen: serverTimestamp()
+      });
+    } else {
+      // 문서가 존재하지 않으면 새로 생성
+      await addDoc(collection(db, "onlineUsers"), {
+        authorId: userId,
+        ...updateData,
+        lastSeen: serverTimestamp(),
+        isOnline: true
+      });
+    }
   } catch (error) {
     console.error("접속자 업데이트 오류:", error);
     throw new Error("접속자 정보 업데이트에 실패했습니다.");
@@ -54,10 +69,20 @@ export const updateOnlineUser = async (userId, updateData) => {
 export const updateUserActivity = async (userId) => {
   try {
     const userRef = doc(db, "onlineUsers", userId);
-    await updateDoc(userRef, {
-      lastActivity: serverTimestamp(),
-      lastSeen: serverTimestamp()
-    });
+    
+    // 문서가 존재하는지 먼저 확인
+    const userDoc = await getDoc(userRef);
+    
+    if (userDoc.exists()) {
+      // 문서가 존재하면 업데이트
+      await updateDoc(userRef, {
+        lastActivity: serverTimestamp(),
+        lastSeen: serverTimestamp()
+      });
+    } else {
+      // 문서가 존재하지 않으면 무시 (로그만 출력)
+      console.log(`사용자 ${userId}의 온라인 상태 문서가 존재하지 않습니다.`);
+    }
   } catch (error) {
     console.error("사용자 활동 업데이트 오류:", error);
   }

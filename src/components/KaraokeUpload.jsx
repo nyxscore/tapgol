@@ -215,10 +215,20 @@ const KaraokeUpload = () => {
                 </div>
                 <div className="flex items-center space-x-3">
                   {preview && (
-                    <img src={preview} alt="비디오 썸네일" className="w-16 h-12 object-cover rounded" />
+                    <div className="relative">
+                      <img src={preview} alt="비디오 썸네일" className="w-16 h-12 object-cover rounded" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="bg-black bg-opacity-50 rounded-full p-1">
+                          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
                   )}
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
+                    <p className="text-xs text-gray-500">노래자랑 영상</p>
                   </div>
                 </div>
               </div>

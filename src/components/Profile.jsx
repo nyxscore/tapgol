@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
-import { updateProfile, onAuthStateChanged, deleteUser } from "firebase/auth";
+import { updateProfile, updateEmail, onAuthStateChanged, deleteUser, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { signOut } from "firebase/auth";
 import { getUserProfile, updateUserProfile, deleteUserAccount } from "../util/userService";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { storage } from "../util/firebase";
+import { FaCamera, FaTrash, FaEdit } from "react-icons/fa";
 
 const Profile = () => {
   const [user, setUser] = useState(null);
@@ -14,6 +17,11 @@ const Profile = () => {
   const [success, setSuccess] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
+  const fileInputRef = useRef(null);
   const navigate = useNavigate();
 
   const interests = [
@@ -22,6 +30,7 @@ const Profile = () => {
 
   const [form, setForm] = useState({
     name: "",
+    email: "",
     nickname: "",
     phone: "",
     birthDate: "",
@@ -45,6 +54,7 @@ const Profile = () => {
             setUserData(userProfile);
             setForm({
               name: userProfile.name || currentUser.displayName || "",
+              email: currentUser.email || "",
               nickname: userProfile.nickname || "",
               phone: userProfile.phone || "",
               birthDate: userProfile.birthDate || "",
@@ -56,6 +66,7 @@ const Profile = () => {
             console.error("사용자 정보 로드 오류:", error);
             setForm({
               name: currentUser.displayName || "",
+              email: currentUser.email || "",
               nickname: "",
               phone: "",
               birthDate: "",
@@ -103,6 +114,135 @@ const Profile = () => {
     }
   };
 
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // 파일 크기 검증 (5MB 이하)
+      if (file.size > 5 * 1024 * 1024) {
+        setError("이미지 파일 크기는 5MB 이하여야 합니다.");
+        return;
+      }
+
+      // 파일 타입 검증
+      if (!file.type.startsWith('image/')) {
+        setError("이미지 파일만 업로드 가능합니다.");
+        return;
+      }
+
+      // 미리보기 생성
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleImageUpload = async () => {
+    if (!fileInputRef.current?.files[0]) {
+      setError("업로드할 이미지를 선택해주세요.");
+      return;
+    }
+
+    setUploadingImage(true);
+    setError("");
+
+    try {
+      const file = fileInputRef.current.files[0];
+      const currentUser = auth.currentUser;
+      
+      if (!currentUser) {
+        throw new Error("사용자가 로그인되지 않았습니다.");
+      }
+
+      // 기존 프로필 이미지 삭제
+      if (userData?.profileImage) {
+        try {
+          const oldImageRef = ref(storage, userData.profileImage);
+          await deleteObject(oldImageRef);
+        } catch (deleteError) {
+          console.warn("기존 이미지 삭제 실패:", deleteError);
+        }
+      }
+
+      // 새 이미지 업로드
+      const imageRef = ref(storage, `profile-images/${currentUser.uid}/${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(imageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+
+      // Firebase Auth 프로필 업데이트
+      await updateProfile(currentUser, {
+        photoURL: downloadURL
+      });
+
+      // Firestore 사용자 정보 업데이트
+      await updateUserProfile(currentUser.uid, {
+        profileImage: downloadURL
+      });
+
+      // 상태 업데이트
+      setUser({ ...currentUser, photoURL: downloadURL });
+      setUserData(prev => ({ ...prev, profileImage: downloadURL }));
+      setImagePreview(null);
+      
+      // 파일 입력 초기화
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
+      setSuccess("프로필 이미지가 성공적으로 업로드되었습니다!");
+    } catch (error) {
+      console.error("이미지 업로드 오류:", error);
+      setError("이미지 업로드에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleImageDelete = async () => {
+    if (!userData?.profileImage) {
+      setError("삭제할 프로필 이미지가 없습니다.");
+      return;
+    }
+
+    setUploadingImage(true);
+    setError("");
+
+    try {
+      const currentUser = auth.currentUser;
+      
+      if (!currentUser) {
+        throw new Error("사용자가 로그인되지 않았습니다.");
+      }
+
+      // Storage에서 이미지 삭제
+      const imageRef = ref(storage, userData.profileImage);
+      await deleteObject(imageRef);
+
+      // Firebase Auth 프로필 업데이트
+      await updateProfile(currentUser, {
+        photoURL: null
+      });
+
+      // Firestore 사용자 정보 업데이트
+      await updateUserProfile(currentUser.uid, {
+        profileImage: null
+      });
+
+      // 상태 업데이트
+      setUser({ ...currentUser, photoURL: null });
+      setUserData(prev => ({ ...prev, profileImage: null }));
+      setImagePreview(null);
+
+      setSuccess("프로필 이미지가 삭제되었습니다.");
+    } catch (error) {
+      console.error("이미지 삭제 오류:", error);
+      setError("이미지 삭제에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleEdit = () => {
     setEditing(true);
     setError("");
@@ -111,9 +251,11 @@ const Profile = () => {
 
   const handleCancel = () => {
     setEditing(false);
+    setImagePreview(null);
     // 원래 데이터로 복원
     setForm({
       name: userData?.name || user?.displayName || "",
+      email: user?.email || "",
       nickname: userData?.nickname || "",
       phone: userData?.phone || "",
       birthDate: userData?.birthDate || "",
@@ -131,6 +273,16 @@ const Profile = () => {
     setSuccess("");
 
     try {
+      // 이메일 검증
+      if (!form.email.trim()) {
+        throw new Error("이메일을 입력해주세요.");
+      }
+      
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(form.email)) {
+        throw new Error("올바른 이메일 형식을 입력해주세요.");
+      }
+
       // 현재 사용자 상태 재확인
       const currentUser = auth.currentUser;
       if (!currentUser) {
@@ -156,9 +308,23 @@ const Profile = () => {
         }
       }
 
+      // Firebase Auth 이메일 업데이트 (선택적)
+      if (form.email !== currentUser.email) {
+        try {
+          await updateEmail(currentUser, form.email);
+        } catch (emailError) {
+          console.warn("이메일 업데이트 실패:", emailError);
+          // 이메일 업데이트가 실패해도 Firestore 업데이트는 계속 진행
+          if (emailError.code === 'auth/requires-recent-login') {
+            throw new Error("이메일 변경을 위해 다시 로그인해주세요.");
+          }
+        }
+      }
+
       // Firestore 사용자 정보 업데이트
       await updateUserProfile(currentUser.uid, {
         name: form.name,
+        email: form.email,
         nickname: form.nickname,
         phone: form.phone,
         birthDate: form.birthDate,
@@ -172,10 +338,11 @@ const Profile = () => {
       setEditing(false);
       
       // 사용자 상태 업데이트
-      setUser({ ...currentUser, displayName: form.name });
+      setUser({ ...currentUser, displayName: form.name, email: form.email });
       setUserData({
         ...userData,
         name: form.name,
+        email: form.email,
         nickname: form.nickname,
         phone: form.phone,
         birthDate: form.birthDate,
@@ -200,8 +367,10 @@ const Profile = () => {
       } else if (error.message.includes("로그인되지 않았습니다")) {
         errorMessage = "로그인이 필요합니다.";
         navigate("/login");
+      } else if (error.message.includes("본인의 데이터만")) {
+        errorMessage = "본인의 데이터만 수정할 수 있습니다.";
       } else {
-        errorMessage += " " + error.message;
+        errorMessage = error.message || errorMessage;
       }
       
       setError(errorMessage);
@@ -226,8 +395,20 @@ const Profile = () => {
       return;
     }
 
-    if (!window.confirm("정말로 회원탈퇴를 진행하시겠습니까?\n\n⚠️ 주의사항:\n• 모든 게시글, 댓글, 업로드 파일이 영구적으로 삭제됩니다\n• 복구가 불가능합니다\n• 탈퇴 후에는 같은 아이디로 재가입할 수 있습니다\n\n계속하시겠습니까?")) {
+    if (!showPasswordConfirm) {
+      setShowPasswordConfirm(true);
+      return;
+    }
+
+    if (!deletePassword.trim()) {
+      setError("비밀번호를 입력해주세요.");
+      return;
+    }
+
+    if (!window.confirm("정말로 회원탈퇴를 진행하시겠습니까?\n\n⚠️ 주의사항:\n• 모든 게시글, 댓글, 업로드 파일이 영구적으로 삭제됩니다\n• 복구가 불가능합니다\n• 탈퇴 후에는 같은 이메일로 재가입할 수 있습니다\n\n계속하시겠습니까?")) {
       setShowDeleteConfirm(false);
+      setShowPasswordConfirm(false);
+      setDeletePassword("");
       return;
     }
 
@@ -236,13 +417,22 @@ const Profile = () => {
     setSuccess("");
 
     try {
-      // 1. Firestore의 모든 사용자 데이터 삭제
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error("사용자가 로그인되지 않았습니다.");
+      }
+
+      // 1. 재인증 수행
+      const credential = EmailAuthProvider.credential(currentUser.email, deletePassword);
+      await reauthenticateWithCredential(currentUser, credential);
+
+      // 2. Firestore의 모든 사용자 데이터 삭제
       await deleteUserAccount(user.uid);
       
-      // 2. Firebase Auth 계정 삭제
-      await deleteUser(user);
+      // 3. Firebase Auth 계정 삭제
+      await deleteUser(currentUser);
       
-      // 3. 성공 메시지 표시 후 메인 페이지로 이동
+      // 4. 성공 메시지 표시 후 메인 페이지로 이동
       setSuccess("회원탈퇴가 완료되었습니다. 이용해주셔서 감사했습니다.");
       
       setTimeout(() => {
@@ -254,7 +444,11 @@ const Profile = () => {
       
       let errorMessage = "회원탈퇴 처리 중 오류가 발생했습니다.";
       
-      if (error.message.includes("requires-recent-login")) {
+      if (error.code === "auth/wrong-password") {
+        errorMessage = "비밀번호가 올바르지 않습니다.";
+      } else if (error.code === "auth/too-many-requests") {
+        errorMessage = "너무 많은 시도가 있었습니다. 잠시 후 다시 시도해주세요.";
+      } else if (error.code === "auth/requires-recent-login") {
         errorMessage = "보안을 위해 최근에 로그인한 기록이 필요합니다. 다시 로그인 후 시도해주세요.";
         // 로그아웃 후 로그인 페이지로 이동
         setTimeout(() => {
@@ -268,11 +462,13 @@ const Profile = () => {
           navigate("/login");
         }, 2000);
       } else {
-        errorMessage += " " + error.message;
+        errorMessage += " " + (error.message || error.code);
       }
       
       setError(errorMessage);
       setShowDeleteConfirm(false);
+      setShowPasswordConfirm(false);
+      setDeletePassword("");
     } finally {
       setDeleting(false);
     }
@@ -340,8 +536,40 @@ const Profile = () => {
         {/* 프로필 정보 */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
           <div className="flex items-center mb-6">
-            <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-white text-2xl font-bold mr-4">
-              {user.displayName ? user.displayName.charAt(0) : user.email?.charAt(0) || "U"}
+            <div className="relative mr-4">
+              <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-amber-200">
+                {user.photoURL || userData?.profileImage ? (
+                  <>
+                    <img 
+                      src={user.photoURL || userData?.profileImage} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                    <div className="w-full h-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-2xl font-bold" style={{ display: 'none' }}>
+                      {user.displayName ? user.displayName.charAt(0) : user.email?.charAt(0) || "U"}
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-2xl font-bold">
+                    {user.displayName ? user.displayName.charAt(0) : user.email?.charAt(0) || "U"}
+                  </div>
+                )}
+              </div>
+              {editing && (
+                <div className="absolute -bottom-1 -right-1">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-8 h-8 bg-amber-600 text-white rounded-full flex items-center justify-center hover:bg-amber-700 transition-colors shadow-lg"
+                    title="프로필 이미지 변경"
+                  >
+                    <FaCamera className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
             <div>
               <h2 className="text-xl font-bold text-gray-800">
@@ -374,6 +602,24 @@ const Profile = () => {
                 />
               ) : (
                 <p className="text-gray-800 py-3">{form.name || "미설정"}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                이메일 *
+              </label>
+              {editing ? (
+                <input
+                  type="email"
+                  name="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  placeholder="이메일을 입력하세요"
+                />
+              ) : (
+                <p className="text-gray-800 py-3">{form.email || "미설정"}</p>
               )}
             </div>
 
@@ -551,6 +797,77 @@ const Profile = () => {
             로그아웃
           </button>
 
+          {/* 프로필 이미지 업로드/삭제 */}
+          {editing && (
+            <div className="border-t pt-4">
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                프로필 이미지 관리
+              </h3>
+              <div className="flex items-center space-x-4 mb-4">
+                <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gray-300 flex items-center justify-center bg-gray-100">
+                  {imagePreview ? (
+                    <img src={imagePreview} alt="Profile Preview" className="w-full h-full object-cover" />
+                  ) : user.photoURL || userData?.profileImage ? (
+                    <img 
+                      src={user.photoURL || userData?.profileImage} 
+                      alt="Current Profile" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-gray-400 text-4xl">👤</span>
+                  )}
+                </div>
+                <div className="flex-1 space-y-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
+                    ref={fileInputRef}
+                    disabled={uploadingImage}
+                  />
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center bg-amber-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50"
+                      disabled={uploadingImage}
+                    >
+                      <FaCamera className="mr-2" /> 
+                      {user.photoURL || userData?.profileImage ? '이미지 변경' : '이미지 업로드'}
+                    </button>
+                    {(user.photoURL || userData?.profileImage) && (
+                      <button
+                        onClick={handleImageDelete}
+                        className="flex items-center bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+                        disabled={uploadingImage}
+                      >
+                        <FaTrash className="mr-2" /> 이미지 삭제
+                      </button>
+                    )}
+                  </div>
+                  {imagePreview && (
+                    <button
+                      onClick={handleImageUpload}
+                      className="w-full bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                      disabled={uploadingImage}
+                    >
+                      {uploadingImage ? '업로드 중...' : '업로드 확인'}
+                    </button>
+                  )}
+                </div>
+              </div>
+              {uploadingImage && (
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-600 mr-2"></div>
+                  이미지 업로드 중...
+                </div>
+              )}
+              <p className="text-xs text-gray-500 mt-2">
+                * 이미지 파일 크기는 5MB 이하여야 하며, JPG, PNG, GIF 형식을 지원합니다.
+              </p>
+            </div>
+          )}
+
           {/* 회원탈퇴 버튼 */}
           <div className="border-t pt-4">
             <button
@@ -559,8 +876,10 @@ const Profile = () => {
               className={`w-full font-semibold py-3 px-6 rounded-lg transition-colors ${
                 deleting
                   ? "bg-gray-400 text-white cursor-not-allowed"
-                  : showDeleteConfirm
+                  : showPasswordConfirm
                   ? "bg-red-700 text-white hover:bg-red-800"
+                  : showDeleteConfirm
+                  ? "bg-red-600 text-white hover:bg-red-700"
                   : "bg-red-100 text-red-700 hover:bg-red-200"
               }`}
             >
@@ -572,16 +891,51 @@ const Profile = () => {
                   </svg>
                   탈퇴 처리 중...
                 </div>
+              ) : showPasswordConfirm ? (
+                "비밀번호 확인 후 탈퇴"
               ) : showDeleteConfirm ? (
                 "정말 탈퇴하시겠습니까?"
               ) : (
                 "회원탈퇴"
               )}
             </button>
-            {showDeleteConfirm && !deleting && (
+            {showDeleteConfirm && !deleting && !showPasswordConfirm && (
               <p className="text-sm text-red-600 mt-2 text-center">
                 ⚠️ 탈퇴 시 모든 데이터가 영구적으로 삭제됩니다
               </p>
+            )}
+            {showPasswordConfirm && !deleting && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700 mb-3">
+                  보안을 위해 비밀번호를 입력해주세요.
+                </p>
+                <input
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-red-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400"
+                  placeholder="현재 비밀번호를 입력하세요"
+                />
+                <div className="flex space-x-2 mt-3">
+                  <button
+                    onClick={() => {
+                      setShowDeleteConfirm(false);
+                      setShowPasswordConfirm(false);
+                      setDeletePassword("");
+                    }}
+                    className="flex-1 bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600 transition-colors"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={!deletePassword.trim()}
+                    className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-400"
+                  >
+                    탈퇴 진행
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>

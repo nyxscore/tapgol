@@ -10,7 +10,7 @@ const BoardEdit = () => {
   const [form, setForm] = useState({
     title: "",
     content: "",
-    category: "일반"
+    category: "정기모임"
   });
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -35,7 +35,7 @@ const BoardEdit = () => {
           setForm({
             title: postData.title || "",
             content: postData.content || "",
-            category: postData.category || "일반"
+            category: postData.category || "정기모임"
           });
         } catch (error) {
           console.error("게시글 로드 오류:", error);
@@ -120,10 +120,10 @@ const BoardEdit = () => {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-amber-700 mb-2">
-                게시글 수정
+                모임글 수정
               </h1>
               <p className="text-gray-600">
-                게시글 내용을 수정해주세요
+                모임글 내용을 수정해주세요
               </p>
             </div>
             <button
@@ -152,11 +152,10 @@ const BoardEdit = () => {
                 onChange={handleInputChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
               >
-                <option value="일반">일반</option>
-                <option value="이벤트">이벤트</option>
-                <option value="건의사항">건의사항</option>
-                <option value="질문">질문</option>
-                <option value="후기">후기</option>
+                <option value="정기모임">정기모임</option>
+                <option value="벙개모임">벙개모임</option>
+                <option value="모임후기">모임후기</option>
+                <option value="모임건의사항">모임건의사항</option>
               </select>
             </div>
 

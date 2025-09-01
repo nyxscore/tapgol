@@ -7,6 +7,7 @@ import { FaPlus, FaSearch, FaFilter } from 'react-icons/fa';
 const Marketplace = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const { user } = useAuth();
@@ -30,26 +31,36 @@ const Marketplace = () => {
   const loadPosts = async () => {
     try {
       setLoading(true);
+      setError(null);
       const postsData = await getMarketplacePosts(20);
       setPosts(postsData);
     } catch (error) {
       console.error('중고장터 게시글 로딩 오류:', error);
+      setError('게시글을 불러오는데 실패했습니다. 다시 시도해주세요.');
     } finally {
       setLoading(false);
     }
   };
 
   const formatPrice = (price) => {
-    return price ? `${price.toLocaleString()}원` : '가격협의';
+    if (!price || isNaN(price)) return '가격협의';
+    return `${price.toLocaleString()}원`;
   };
 
   const formatDate = (timestamp) => {
     if (!timestamp) return '';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString('ko-KR');
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleDateString('ko-KR');
+    } catch (error) {
+      console.error('날짜 포맷 오류:', error);
+      return '';
+    }
   };
 
   const filteredPosts = posts.filter(post => {
+    if (!post) return false;
+    
     const matchesSearch = post.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          post.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || post.category === categoryFilter;
@@ -66,7 +77,16 @@ const Marketplace = () => {
   };
 
   const handlePostClick = (postId) => {
+    if (!postId) {
+      console.error('게시글 ID가 없습니다.');
+      return;
+    }
     navigate(`/marketplace/${postId}`);
+  };
+
+  const handleImageError = (e) => {
+    e.target.style.display = 'none';
+    e.target.nextSibling.style.display = 'flex';
   };
 
   if (loading) {
@@ -75,6 +95,24 @@ const Marketplace = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">중고장터를 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h3 className="text-xl font-semibold text-gray-700 mb-2">오류가 발생했습니다</h3>
+          <p className="text-gray-500 mb-6">{error}</p>
+          <button
+            onClick={loadPosts}
+            className="px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+          >
+            다시 시도
+          </button>
         </div>
       </div>
     );
@@ -156,11 +194,18 @@ const Marketplace = () => {
               >
                 <div className="aspect-square bg-gray-200 relative">
                   {post.images && post.images.length > 0 ? (
-                    <img
-                      src={post.images[0]}
-                      alt={post.title}
-                      className="w-full h-full object-cover"
-                    />
+                    <>
+                      <img
+                        src={post.images[0]}
+                        alt={post.title || '상품 이미지'}
+                        className="w-full h-full object-cover"
+                        onError={handleImageError}
+                        loading="lazy"
+                      />
+                      <div className="w-full h-full flex items-center justify-center text-gray-400 hidden">
+                        <span className="text-4xl">📷</span>
+                      </div>
+                    </>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400">
                       <span className="text-4xl">📷</span>
@@ -174,14 +219,20 @@ const Marketplace = () => {
                 </div>
                 <div className="p-4">
                   <h3 className="font-semibold text-gray-800 mb-2 line-clamp-2">
-                    {post.title}
+                    {post.title || '제목 없음'}
                   </h3>
                   <p className="text-amber-600 font-bold text-lg mb-2">
                     {formatPrice(post.price)}
                   </p>
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <span>{post.location || '위치 미설정'}</span>
-                    <span>{formatDate(post.createdAt)}</span>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="flex flex-col">
+                      <span className="text-gray-500 text-xs mb-1">위치</span>
+                      <span className="text-gray-600">{post.location || '위치 미설정'}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-gray-500 text-xs mb-1">등록일</span>
+                      <span className="text-gray-600">{formatDate(post.createdAt)}</span>
+                    </div>
                   </div>
                   {post.category && (
                     <div className="mt-2">

@@ -14,7 +14,7 @@ import {
 } from "../util/commentService";
 import { formatTextWithLinks } from "../util/textUtils.jsx";
 
-const CommentSection = ({ postId, boardType = "board" }) => {
+const CommentSection = ({ postId, postType = "board", boardType = "board" }) => {
   const [comments, setComments] = useState([]);
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
@@ -49,19 +49,21 @@ const CommentSection = ({ postId, boardType = "board" }) => {
 
     loadComments();
     return () => unsubscribe();
-  }, [postId, boardType]);
+  }, [postId, postType, boardType]);
 
   const loadComments = async () => {
     try {
       setLoading(true);
-      const commentsData = await getComments(postId, boardType);
+      // postType이 있으면 postType을 사용, 없으면 boardType을 사용
+      const typeToUse = postType || boardType;
+      const commentsData = await getComments(postId, typeToUse);
       setComments(commentsData);
       
       // 각 댓글의 대댓글도 로드
       const repliesData = {};
       for (const comment of commentsData) {
         try {
-          const commentReplies = await getReplies(comment.id, boardType);
+          const commentReplies = await getReplies(comment.id, typeToUse);
           repliesData[comment.id] = commentReplies;
         } catch (error) {
           console.error(`댓글 ${comment.id}의 대댓글 로드 오류:`, error);
@@ -97,6 +99,9 @@ const CommentSection = ({ postId, boardType = "board" }) => {
     setError("");
     
     try {
+      // postType이 있으면 postType을 사용, 없으면 boardType을 사용
+      const typeToUse = postType || boardType;
+      
       const commentData = {
         content: newComment.trim(),
         author: userData?.nickname || userData?.name || user.displayName || "익명",
@@ -105,7 +110,7 @@ const CommentSection = ({ postId, boardType = "board" }) => {
       };
 
       // 댓글 작성
-      const newCommentDoc = await createComment(postId, commentData, boardType);
+      const newCommentDoc = await createComment(postId, commentData, typeToUse);
       
       // 즉시 로컬 상태에 추가 (UI 즉시 업데이트)
       setComments(prevComments => [...prevComments, newCommentDoc]);
@@ -210,6 +215,9 @@ const CommentSection = ({ postId, boardType = "board" }) => {
     setSubmittingReply(prev => ({ ...prev, [commentId]: true }));
     
     try {
+      // postType이 있으면 postType을 사용, 없으면 boardType을 사용
+      const typeToUse = postType || boardType;
+      
       const replyData = {
         content: newReply[commentId].trim(),
         author: userData?.nickname || userData?.name || user.displayName || "익명",
@@ -217,7 +225,7 @@ const CommentSection = ({ postId, boardType = "board" }) => {
         authorEmail: user.email
       };
 
-      const newReplyDoc = await createReply(commentId, replyData, boardType);
+      const newReplyDoc = await createReply(commentId, replyData, typeToUse);
       
       // 즉시 로컬 상태에 추가
       setReplies(prev => ({

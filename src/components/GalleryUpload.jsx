@@ -68,7 +68,13 @@ const GalleryUpload = () => {
     } else if (file.type.startsWith('video/')) {
       const video = document.createElement('video');
       video.onloadedmetadata = () => {
-        setPreview(URL.createObjectURL(file));
+        // 동영상의 첫 번째 프레임을 캡처하여 썸네일 생성
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        setPreview(canvas.toDataURL());
       };
       video.src = URL.createObjectURL(file);
     }
@@ -163,9 +169,9 @@ const GalleryUpload = () => {
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              갤러리로 돌아가기
+                              추억앨범으로 돌아가기
             </button>
-            <h1 className="text-2xl font-bold text-gray-800">갤러리 업로드</h1>
+            <h1 className="text-2xl font-bold text-gray-800">추억앨범 업로드</h1>
             <div className="w-24"></div>
           </div>
         </div>
@@ -225,7 +231,7 @@ const GalleryUpload = () => {
                 </div>
                 <div className="flex items-center space-x-4">
                   {preview && (
-                    <div className="flex-shrink-0">
+                    <div className="flex-shrink-0 relative">
                       {selectedFile.type.startsWith('image/') ? (
                         <img
                           src={preview}
@@ -233,11 +239,20 @@ const GalleryUpload = () => {
                           className="w-20 h-20 object-cover rounded-lg"
                         />
                       ) : (
-                        <video
-                          src={preview}
-                          className="w-20 h-20 object-cover rounded-lg"
-                          muted
-                        />
+                        <div className="relative">
+                          <img
+                            src={preview}
+                            alt="동영상 썸네일"
+                            className="w-20 h-20 object-cover rounded-lg"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="bg-black bg-opacity-50 rounded-full p-1">
+                              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}

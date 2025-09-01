@@ -104,17 +104,17 @@ const Board = () => {
         {/* 헤더 */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
           <h1 className="text-3xl font-bold text-amber-700 mb-2 text-center">
-            자유게시판
+            모임게시판
           </h1>
           <p className="text-gray-600 text-center">
-            탑골공원 이야기를 자유롭게 나누어보세요
+            탑골공원 모임과 활동을 함께 나누어보세요
           </p>
         </div>
 
         {/* 게시글 목록 */}
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-gray-800">최신 게시글</h2>
+            <h2 className="text-xl font-bold text-gray-800">최신 모임 게시글</h2>
             <button 
               onClick={handleWriteClick}
               className={`px-4 py-2 rounded-lg transition-colors ${
@@ -123,7 +123,7 @@ const Board = () => {
                   : "bg-gray-400 text-white hover:bg-gray-500"
               }`}
             >
-              {user ? "글쓰기" : "로그인 후 글쓰기"}
+                             {user ? "모임글쓰기" : "로그인 후 모임글쓰기"}
             </button>
           </div>
 
@@ -142,35 +142,51 @@ const Board = () => {
                   className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-800 hover:text-amber-700 transition-colors">
-                          {post.title}
-                        </h3>
-                        <span className="bg-amber-100 text-amber-800 px-2 py-1 rounded-full text-xs font-semibold">
-                          {post.category || "일반"}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-4 text-sm text-gray-600">
-                        <span>작성자: {post.author}</span>
-                        <span>작성일: {formatDate(post.createdAt)}</span>
-                        <span>조회수: {post.views || 0}</span>
-                        <div className="flex items-center space-x-1">
-                          <svg 
-                            className={`w-4 h-4 ${isLikedByUser(post) ? "text-red-500 fill-current" : "text-gray-400"}`} 
-                            stroke="currentColor" 
-                            viewBox="0 0 24 24"
-                          >
-                            <path 
-                              strokeLinecap="round" 
-                              strokeLinejoin="round" 
-                              strokeWidth={2} 
-                              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
-                            />
-                          </svg>
-                          <span className={isLikedByUser(post) ? "text-red-500 font-semibold" : ""}>
-                            {post.likes || 0}
-                          </span>
+                                         <div className="flex-1">
+                       <div className="mb-2">
+                         <h3 className="text-lg font-semibold text-gray-800 hover:text-amber-700 transition-colors mb-2">
+                           {post.title}
+                         </h3>
+                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                           post.category === "정기모임" 
+                             ? "bg-red-500 text-white" 
+                             : "bg-amber-100 text-amber-800"
+                         }`}>
+                           {post.category || "정기모임"}
+                         </span>
+                       </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                        <div className="flex flex-col">
+                          <span className="text-gray-500 text-xs mb-1">작성자</span>
+                          <span className="font-medium text-gray-800">{post.author}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-gray-500 text-xs mb-1">작성일</span>
+                          <span className="text-gray-600">{formatDate(post.createdAt)}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-gray-500 text-xs mb-1">조회수</span>
+                          <span className="text-gray-600">{post.views || 0}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-gray-500 text-xs mb-1">좋아요</span>
+                          <div className="flex items-center space-x-1">
+                            <svg 
+                              className={`w-4 h-4 ${isLikedByUser(post) ? "text-red-500 fill-current" : "text-gray-400"}`} 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round" 
+                                strokeWidth={2} 
+                                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                              />
+                            </svg>
+                            <span className={`${isLikedByUser(post) ? "text-red-500 font-semibold" : "text-gray-600"}`}>
+                              {post.likes || 0}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>

@@ -184,7 +184,7 @@ const BoardDetail = () => {
               </svg>
               목록으로 돌아가기
             </button>
-            <h1 className="text-2xl font-bold text-gray-800">게시글</h1>
+            <h1 className="text-2xl font-bold text-gray-800">모임게시판</h1>
             <div className="w-24"></div>
           </div>
         </div>
@@ -193,47 +193,72 @@ const BoardDetail = () => {
         <div className="bg-white rounded-2xl shadow-xl p-6">
           {/* 게시글 헤더 */}
           <div className="border-b border-gray-200 pb-6 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-2">
-                <h2 className="text-2xl font-bold text-gray-800">{post.title}</h2>
-                <span className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm font-semibold">
-                  {post.category || "일반"}
-                </span>
-              </div>
-              {isAuthor && (
-                <div className="flex space-x-2">
-                  <button
-                    onClick={handleEdit}
-                    className="px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-                  >
-                    수정
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className={`px-3 py-1 rounded-lg transition-colors text-sm ${
-                      deleting
-                        ? "bg-gray-400 text-white cursor-not-allowed"
-                        : "bg-red-500 text-white hover:bg-red-600"
-                    }`}
-                  >
-                    {deleting ? "삭제 중..." : "삭제"}
-                  </button>
+                        <div className="mb-4">
+              <div className="mb-3">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">{post.title}</h2>
+                <div className="flex items-center justify-between">
+                  <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                    post.category === "정기모임" 
+                      ? "bg-red-500 text-white" 
+                      : "bg-amber-100 text-amber-800"
+                  }`}>
+                    {post.category || "정기모임"}
+                  </span>
+                  {isAuthor && (
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={handleEdit}
+                        className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm flex items-center"
+                      >
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        수정
+                      </button>
+                      <button
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className={`px-3 py-1 rounded transition-colors text-sm flex items-center ${
+                          deleting
+                            ? "bg-gray-400 text-white cursor-not-allowed"
+                            : "bg-red-500 text-white hover:bg-red-600"
+                        }`}
+                      >
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        {deleting ? "삭제 중..." : "삭제"}
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
             
-            <div className="flex items-center justify-between text-sm text-gray-600">
-              <div className="flex items-center space-x-4">
-                <span>작성자: <span className="font-semibold">{post.author}</span></span>
-                <span>작성일: {formatDate(post.createdAt)}</span>
-                {post.updatedAt && post.updatedAt !== post.createdAt && (
-                  <span>수정일: {formatDate(post.updatedAt)}</span>
-                )}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+              <div className="flex flex-col">
+                <span className="text-gray-500 text-xs mb-1">작성자</span>
+                <span className="font-medium text-gray-800">{post.author}</span>
               </div>
-              <div className="flex items-center space-x-4">
-                <span>조회수: {post.views || 0}</span>
-                <span>좋아요: {post.likes || 0}</span>
+              <div className="flex flex-col">
+                <span className="text-gray-500 text-xs mb-1">작성일</span>
+                <span className="text-gray-600">{formatDate(post.createdAt)}</span>
+              </div>
+              {post.updatedAt && post.updatedAt !== post.createdAt && (
+                <div className="flex flex-col">
+                  <span className="text-gray-500 text-xs mb-1">수정일</span>
+                  <span className="text-gray-600">{formatDate(post.updatedAt)}</span>
+                </div>
+              )}
+              <div className="flex flex-col">
+                <span className="text-gray-500 text-xs mb-1">조회수</span>
+                <div className="flex items-center space-x-1">
+                  <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-gray-600">{post.views || 0}</span>
+                </div>
               </div>
             </div>
           </div>

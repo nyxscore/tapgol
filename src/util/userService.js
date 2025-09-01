@@ -94,14 +94,60 @@ export const updateUserProfile = async (userId, updateData) => {
       throw new Error("본인의 데이터만 수정할 수 있습니다.");
     }
     
+    // 데이터 검증
+    const validatedData = { ...updateData };
+    
+    // 이름 검증
+    if (validatedData.name !== undefined && (!validatedData.name || validatedData.name.trim().length === 0)) {
+      throw new Error("이름을 입력해주세요.");
+    }
+    
+    // 닉네임 검증
+    if (validatedData.nickname !== undefined && (!validatedData.nickname || validatedData.nickname.trim().length === 0)) {
+      throw new Error("닉네임을 입력해주세요.");
+    }
+    
+    // 전화번호 검증
+    if (validatedData.phone !== undefined && validatedData.phone && !/^[0-9-]+$/.test(validatedData.phone)) {
+      throw new Error("올바른 전화번호 형식을 입력해주세요.");
+    }
+    
+    // 관심사 검증
+    if (validatedData.interests !== undefined && !Array.isArray(validatedData.interests)) {
+      validatedData.interests = [];
+    }
+    
     const userRef = doc(db, "users", userId);
     await updateDoc(userRef, {
-      ...updateData,
+      ...validatedData,
       updatedAt: new Date()
     });
     return true;
   } catch (error) {
     console.error("사용자 정보 업데이트 오류:", error);
+    throw error;
+  }
+};
+
+// 프로필 이미지 업데이트
+export const updateProfileImage = async (userId, imageURL) => {
+  try {
+    // 인증 상태 확인
+    const currentUser = await validateUserAuth();
+    
+    // 본인 데이터만 수정 가능하도록 확인
+    if (currentUser.uid !== userId) {
+      throw new Error("본인의 데이터만 수정할 수 있습니다.");
+    }
+    
+    const userRef = doc(db, "users", userId);
+    await updateDoc(userRef, {
+      profileImage: imageURL,
+      updatedAt: new Date()
+    });
+    return true;
+  } catch (error) {
+    console.error("프로필 이미지 업데이트 오류:", error);
     throw error;
   }
 };

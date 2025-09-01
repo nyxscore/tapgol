@@ -3,6 +3,7 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route, Outlet } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
+import ErrorBoundary from "./components/ErrorBoundary";
 import HomePage from "./components/HomePage";
 import Board from "./components/Board";
 import BoardWrite from "./components/BoardWrite";
@@ -22,26 +23,24 @@ import Events from "./components/Events";
 import Karaoke from "./components/Karaoke";
 import KaraokeUpload from "./components/KaraokeUpload";
 import KaraokeDetail from "./components/KaraokeDetail";
-import Playground from "./components/Playground";
+import Cooking from "./components/Cooking";
+import CookingWrite from "./components/CookingWrite";
+import CookingDetail from "./components/CookingDetail";
+import CookingEdit from "./components/CookingEdit";
 import HealthBoard from "./components/HealthBoard";
 import HealthWrite from "./components/HealthWrite";
 import HealthDetail from "./components/HealthDetail";
 import HealthEdit from "./components/HealthEdit";
-import ParkMeetings from "./components/ParkMeetings";
+
 import Alerts from "./components/Alerts";
 import NotificationBoard from "./components/NotificationBoard";
 
-import BadukGame from "./components/games/BadukGame";
-import JanggiGame from "./components/games/JanggiGame";
-import GostopGame from "./components/games/GostopGame";
-import YutnoriGame from "./components/games/YutnoriGame";
-import TetrisGame from "./components/games/TetrisGame";
-import AlumniSearch from "./components/AlumniSearch";
-import AlumniResults from "./components/AlumniResults";
+
 import Marketplace from "./components/Marketplace";
 import MarketplaceWrite from "./components/MarketplaceWrite";
 import MarketplaceDetail from "./components/MarketplaceDetail";
 import MarketplaceEdit from "./components/MarketplaceEdit";
+import ReportManagement from "./components/ReportManagement";
 
 // 메인 레이아웃 컴포넌트
 function MainLayout() {
@@ -60,54 +59,54 @@ function MainLayout() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NotificationsProvider>
-        <Router>
-          <Routes>
-            <Route element={<MainLayout />}>
-              <Route index element={<HomePage />} />
-              <Route path="/board" element={<Board />} />
-              <Route path="/board/write" element={<BoardWrite />} />
-              <Route path="/board/:id" element={<BoardDetail />} />
-              <Route path="/board/edit/:id" element={<BoardEdit />} />
-              <Route path="/gallery" element={<Gallery />} />
-              <Route path="/gallery/upload" element={<GalleryUpload />} />
-              <Route path="/gallery/:id" element={<GalleryDetail />} />
-              <Route path="/chat" element={<Chat />} />
-              <Route path="/chat/main" element={<Chat />} />
-              <Route path="/chat/park/:parkId" element={<Chat />} />
-              <Route path="/community" element={<Community />} />
-              <Route path="/events" element={<Events />} />
-              <Route path="/karaoke" element={<Karaoke />} />
-              <Route path="/karaoke/upload" element={<KaraokeUpload />} />
-              <Route path="/karaoke/:id" element={<KaraokeDetail />} />
-              <Route path="/playground" element={<Playground />} />
-              <Route path="/health" element={<HealthBoard />} />
-              <Route path="/health/write" element={<HealthWrite />} />
-              <Route path="/health/:id" element={<HealthDetail />} />
-              <Route path="/health/edit/:id" element={<HealthEdit />} />
-              <Route path="/park-meetings" element={<ParkMeetings />} />
+    <ErrorBoundary>
+      <AuthProvider>
+        <NotificationsProvider>
+          <Router>
+            <Routes>
+              <Route element={<MainLayout />}>
+                <Route index element={<HomePage />} />
+                <Route path="/board" element={<Board />} />
+                <Route path="/board/write" element={<BoardWrite />} />
+                <Route path="/board/:id" element={<BoardDetail />} />
+                <Route path="/board/edit/:id" element={<BoardEdit />} />
+                <Route path="/gallery" element={<Gallery />} />
+                <Route path="/gallery/upload" element={<GalleryUpload />} />
+                <Route path="/gallery/:id" element={<GalleryDetail />} />
+                <Route path="/chat" element={<Chat />} />
+                <Route path="/chat/main" element={<Chat />} />
+                <Route path="/community" element={<Community />} />
+                <Route path="/events" element={<Events />} />
+                <Route path="/karaoke" element={<Karaoke />} />
+                <Route path="/karaoke/upload" element={<KaraokeUpload />} />
+                <Route path="/karaoke/:id" element={<KaraokeDetail />} />
+                <Route path="/cooking" element={<Cooking />} />
+                <Route path="/cooking/write" element={<CookingWrite />} />
+                <Route path="/cooking/:id" element={<CookingDetail />} />
+                <Route path="/cooking/edit/:id" element={<CookingEdit />} />
+                <Route path="/health" element={<HealthBoard />} />
+                <Route path="/health/write" element={<HealthWrite />} />
+                <Route path="/health/:id" element={<HealthDetail />} />
+                <Route path="/health/edit/:id" element={<HealthEdit />} />
 
-              <Route path="/alerts" element={<Alerts />} />
-              <Route path="/notification-board" element={<NotificationBoard />} />
-              <Route path="/baduk-game" element={<BadukGame />} />
-              <Route path="/janggi-game" element={<JanggiGame />} />
-              <Route path="/gostop-game" element={<GostopGame />} />
-              <Route path="/yutnori-game" element={<YutnoriGame />} />
-              <Route path="/tetris-game" element={<TetrisGame />} />
-              <Route path="/alumni-search" element={<AlumniSearch />} />
-              <Route path="/alumni-results" element={<AlumniResults />} />
-              <Route path="/marketplace" element={<Marketplace />} />
-              <Route path="/marketplace/write" element={<MarketplaceWrite />} />
-              <Route path="/marketplace/:id" element={<MarketplaceDetail />} />
-              <Route path="/marketplace/edit/:id" element={<MarketplaceEdit />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/profile" element={<Profile />} />
-            </Route>
-          </Routes>
-        </Router>
-      </NotificationsProvider>
-    </AuthProvider>
+
+                <Route path="/alerts" element={<Alerts />} />
+                <Route path="/notification-board" element={<NotificationBoard />} />
+
+
+                <Route path="/marketplace" element={<Marketplace />} />
+                <Route path="/marketplace/write" element={<MarketplaceWrite />} />
+                <Route path="/marketplace/:id" element={<MarketplaceDetail />} />
+                <Route path="/marketplace/edit/:id" element={<MarketplaceEdit />} />
+                <Route path="/reports" element={<ReportManagement />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route path="/profile" element={<Profile />} />
+              </Route>
+            </Routes>
+          </Router>
+        </NotificationsProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
