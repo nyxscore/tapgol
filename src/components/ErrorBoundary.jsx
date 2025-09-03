@@ -40,9 +40,13 @@ class ErrorBoundary extends React.Component {
               </button>
               <button
                 onClick={() => window.location.href = '/'}
-                className="w-full px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                className="w-full px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2"
+                title="홈으로 돌아가기"
               >
-                홈으로 돌아가기
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                </svg>
+                <span>홈으로 돌아가기</span>
               </button>
             </div>
             {process.env.NODE_ENV === 'development' && this.state.error && (

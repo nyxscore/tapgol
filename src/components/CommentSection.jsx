@@ -13,6 +13,9 @@ import {
   deleteReply
 } from "../util/commentService";
 import { formatTextWithLinks } from "../util/textUtils.jsx";
+import ReportModal from './ReportModal';
+import UserProfileModal from './UserProfileModal';
+import { FaFlag } from 'react-icons/fa';
 
 const CommentSection = ({ postId, postType = "board", boardType = "board" }) => {
   const [comments, setComments] = useState([]);
@@ -32,6 +35,14 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
   const [submittingReply, setSubmittingReply] = useState({});
   const [editingReply, setEditingReply] = useState({});
   const [editReplyText, setEditReplyText] = useState({});
+  
+  // 신고 관련 상태
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportTarget, setReportTarget] = useState(null);
+
+  // 프로필 모달 관련 상태
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -312,6 +323,49 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
     return user && user.uid === reply.authorId;
   };
 
+  // 신고 관련 함수들
+  const handleReportComment = (comment) => {
+    setReportTarget({
+      id: comment.id,
+      type: 'comment',
+      content: comment.content,
+      author: comment.author,
+      authorId: comment.authorId,
+      boardType: postType || boardType // 게시판 타입 추가
+    });
+    setShowReportModal(true);
+  };
+
+  const handleReportReply = (reply) => {
+    setReportTarget({
+      id: reply.id,
+      type: 'reply',
+      content: reply.content,
+      author: reply.author,
+      authorId: reply.authorId,
+      boardType: postType || boardType, // 게시판 타입 추가
+      parentCommentId: reply.parentCommentId || null // 부모 댓글 ID 추가
+    });
+    setShowReportModal(true);
+  };
+
+  const handleReportSuccess = () => {
+    setShowReportModal(false);
+    setReportTarget(null);
+    alert('신고가 접수되었습니다. 검토 후 조치하겠습니다.');
+  };
+
+  // 프로필 관련 함수들
+  const handleShowProfile = (userId, userName) => {
+    setSelectedUser({ id: userId, name: userName });
+    setShowProfileModal(true);
+  };
+
+  const handleCloseProfileModal = () => {
+    setShowProfileModal(false);
+    setSelectedUser(null);
+  };
+
   if (loading) {
     return (
       <div className="text-center py-8">
@@ -450,7 +504,11 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-2">
-                      <span className="font-semibold text-gray-800">
+                      <span 
+                        className="font-semibold text-gray-800 hover:text-amber-600 cursor-pointer transition-colors"
+                        onClick={() => handleShowProfile(comment.authorId, comment.author)}
+                        title="프로필 보기"
+                      >
                         {comment.author}
                       </span>
                       <span className="text-sm text-gray-500">
@@ -462,32 +520,42 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center space-x-2">
-                      {user && (
-                        <button
-                          onClick={() => toggleReplyForm(comment.id)}
-                          className="text-amber-600 hover:text-amber-700 text-sm"
-                        >
-                          {showReplyForm[comment.id] ? "답글 취소" : "답글"}
-                        </button>
-                      )}
-                      {isCommentAuthor(comment) && (
-                        <>
-                          <button
-                            onClick={() => startEdit(comment)}
-                            className="text-blue-600 hover:text-blue-700 text-sm"
-                          >
-                            수정
-                          </button>
-                          <button
-                            onClick={() => handleDeleteComment(comment.id)}
-                            className="text-red-600 hover:text-red-700 text-sm"
-                          >
-                            삭제
-                          </button>
-                        </>
-                      )}
-                    </div>
+                                         <div className="flex items-center space-x-2">
+                       {user && (
+                         <button
+                           onClick={() => toggleReplyForm(comment.id)}
+                           className="text-amber-600 hover:text-amber-700 text-sm"
+                         >
+                           {showReplyForm[comment.id] ? "답글 취소" : "답글"}
+                         </button>
+                       )}
+                       {user && !isCommentAuthor(comment) && (
+                         <button
+                           onClick={() => handleReportComment(comment)}
+                           className="text-red-600 hover:text-red-700 text-sm flex items-center space-x-1"
+                           title="신고하기"
+                         >
+                           <FaFlag className="text-xs" />
+                           <span>신고</span>
+                         </button>
+                       )}
+                       {isCommentAuthor(comment) && (
+                         <>
+                           <button
+                             onClick={() => startEdit(comment)}
+                             className="text-blue-600 hover:text-blue-700 text-sm"
+                           >
+                             수정
+                           </button>
+                           <button
+                             onClick={() => handleDeleteComment(comment.id)}
+                             className="text-red-600 hover:text-red-700 text-sm"
+                           >
+                             삭제
+                           </button>
+                         </>
+                       )}
+                     </div>
                   </div>
                   <div className="text-gray-700 whitespace-pre-wrap mb-3">
                     {formatTextWithLinks(comment.content)}
@@ -578,7 +646,11 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
                             <div>
                               <div className="flex items-center justify-between mb-1">
                                 <div className="flex items-center space-x-2">
-                                  <span className="font-medium text-gray-800 text-sm">
+                                  <span 
+                                    className="font-medium text-gray-800 text-sm hover:text-amber-600 cursor-pointer transition-colors"
+                                    onClick={() => handleShowProfile(reply.authorId, reply.author)}
+                                    title="프로필 보기"
+                                  >
                                     {reply.author}
                                   </span>
                                   <span className="text-xs text-gray-500">
@@ -590,22 +662,34 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
                                     </span>
                                   )}
                                 </div>
-                                {isReplyAuthor(reply) && (
-                                  <div className="flex space-x-1">
-                                    <button
-                                      onClick={() => startEditReply(reply.id, reply.content)}
-                                      className="text-blue-600 hover:text-blue-700 text-xs"
-                                    >
-                                      수정
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteReply(comment.id, reply.id)}
-                                      className="text-red-600 hover:text-red-700 text-xs"
-                                    >
-                                      삭제
-                                    </button>
-                                  </div>
-                                )}
+                                                                 <div className="flex space-x-1">
+                                   {user && !isReplyAuthor(reply) && (
+                                     <button
+                                       onClick={() => handleReportReply(reply)}
+                                       className="text-red-600 hover:text-red-700 text-xs flex items-center space-x-1"
+                                       title="신고하기"
+                                     >
+                                       <FaFlag className="text-xs" />
+                                       <span>신고</span>
+                                     </button>
+                                   )}
+                                   {isReplyAuthor(reply) && (
+                                     <>
+                                       <button
+                                         onClick={() => startEditReply(reply.id, reply.content)}
+                                         className="text-blue-600 hover:text-blue-700 text-xs"
+                                       >
+                                         수정
+                                       </button>
+                                       <button
+                                         onClick={() => handleDeleteReply(comment.id, reply.id)}
+                                         className="text-red-600 hover:text-red-700 text-xs"
+                                       >
+                                         삭제
+                                       </button>
+                                     </>
+                                   )}
+                                 </div>
                               </div>
                               <div className="text-gray-700 whitespace-pre-wrap text-sm">
                                 {formatTextWithLinks(reply.content)}
@@ -620,10 +704,29 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
               )}
             </div>
           ))
-        )}
-      </div>
-    </div>
-  );
-};
+                 )}
+       </div>
+       
+       {/* 신고 모달 */}
+       {showReportModal && reportTarget && (
+         <ReportModal
+           isOpen={showReportModal}
+           onClose={() => setShowReportModal(false)}
+           targetData={reportTarget}
+           targetType={reportTarget.type}
+           onSuccess={handleReportSuccess}
+         />
+       )}
+
+       {/* 사용자 프로필 모달 */}
+       <UserProfileModal
+         isOpen={showProfileModal}
+         onClose={handleCloseProfileModal}
+         userId={selectedUser?.id}
+         userName={selectedUser?.name}
+       />
+     </div>
+   );
+ };
 
 export default CommentSection;

@@ -103,7 +103,7 @@ const ReportModal = ({
         };
       case "comment":
         return {
-          title: "댓글 신고",
+          title: targetData?.type === "reply" ? "대댓글 신고" : "댓글 신고",
           content: targetData?.content || "댓글 내용",
           author: targetData?.author || "작성자"
         };

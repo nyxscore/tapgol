@@ -112,28 +112,57 @@ export const getGalleryItems = async (limitCount = 20) => {
 // 특정 추억앨범 항목 조회
 export const getGalleryItem = async (itemId) => {
   try {
+    console.log("getGalleryItem 호출됨, itemId:", itemId);
+    
     if (!itemId) {
       throw new Error("추억앨범 항목 ID가 필요합니다.");
     }
 
+    // Firebase 연결 상태 확인
+    if (!db) {
+      console.error("Firebase DB 연결 실패: db 객체가 undefined입니다.");
+      throw new Error("Firebase 데이터베이스에 연결할 수 없습니다.");
+    }
+
+    console.log("Firebase DB 연결 상태:", !!db);
+    console.log("갤러리 컬렉션에 접근 시도...");
+    
     const docRef = doc(db, "gallery", itemId);
+    console.log("문서 참조 생성됨:", docRef);
+    
     const docSnap = await getDoc(docRef);
+    console.log("문서 스냅샷 결과:", docSnap.exists() ? "존재함" : "존재하지 않음");
     
     if (docSnap.exists()) {
       const data = docSnap.data();
+      console.log("문서 데이터 로드 성공:", data);
       return {
         id: docSnap.id,
         ...data
       };
     } else {
-          console.error(`추억앨범 항목을 찾을 수 없습니다. ID: ${itemId}`);
-    throw new Error("추억앨범 항목을 찾을 수 없습니다.");
+      console.error(`추억앨범 항목을 찾을 수 없습니다. ID: ${itemId}`);
+      throw new Error("추억앨범 항목을 찾을 수 없습니다.");
     }
   } catch (error) {
     console.error("추억앨범 항목 조회 오류:", error);
-    if (error.message === "추억앨범 항목을 찾을 수 없습니다.") {
+    console.error("에러 코드:", error.code);
+    console.error("에러 메시지:", error.message);
+    console.error("에러 스택:", error.stack);
+    
+    // Firebase 관련 에러 처리
+    if (error.code === "permission-denied") {
+      throw new Error("접근 권한이 없습니다.");
+    } else if (error.code === "unavailable") {
+      throw new Error("서비스가 일시적으로 사용할 수 없습니다.");
+    } else if (error.code === "not-found") {
+      throw new Error("데이터베이스를 찾을 수 없습니다.");
+    } else if (error.message === "추억앨범 항목을 찾을 수 없습니다.") {
       throw error; // 원래 에러 메시지 유지
+    } else if (error.message.includes("Firebase")) {
+      throw error; // Firebase 연결 에러 유지
     }
+    
     throw new Error("추억앨범 항목을 불러오는데 실패했습니다.");
   }
 };

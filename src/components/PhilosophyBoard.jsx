@@ -2,10 +2,10 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { getKaraokePosts, toggleLike, incrementViews } from "../util/karaokeService";
+import { getPhilosophyPosts, toggleLike, incrementViews } from "../util/philosophyService";
 import UserProfileModal from './UserProfileModal';
 
-const Karaoke = () => {
+const PhilosophyBoard = () => {
   const navigate = useNavigate();
   const [posts, setPosts] = useState([]);
   const [user, setUser] = useState(null);
@@ -17,22 +17,31 @@ const Karaoke = () => {
   const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
+    console.log("PhilosophyBoard 컴포넌트 마운트");
+    
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      console.log("인증 상태 변경:", currentUser ? "로그인됨" : "로그아웃됨");
       setUser(currentUser);
-      loadKaraokePosts();
+      // 사용자 상태가 설정된 후 게시글 로드
+      loadPhilosophyPosts();
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log("PhilosophyBoard 컴포넌트 언마운트");
+      unsubscribe();
+    };
   }, []);
 
-  const loadKaraokePosts = async () => {
+  const loadPhilosophyPosts = async () => {
     try {
+      console.log("loadPhilosophyPosts 함수 시작");
       setLoading(true);
       setError(null);
-      const postsData = await getKaraokePosts();
+      const postsData = await getPhilosophyPosts();
+      console.log("로드된 개똥철학 게시글:", postsData);
       setPosts(postsData);
     } catch (error) {
-      console.error("노래자랑 게시글 로드 오류:", error);
+      console.error("개똥철학 게시글 로드 오류:", error);
       setError("게시글을 불러오는데 실패했습니다.");
     } finally {
       setLoading(false);
@@ -41,27 +50,28 @@ const Karaoke = () => {
 
   const handlePostClick = async (postId) => {
     try {
+      // 조회수 증가 (로그인한 사용자만)
       if (user) {
         await incrementViews(postId);
       }
-      navigate(`/karaoke/${postId}`);
+      navigate(`/philosophy/${postId}`);
     } catch (error) {
       console.error("조회수 증가 오류:", error);
-      navigate(`/karaoke/${postId}`);
+      navigate(`/philosophy/${postId}`);
     }
   };
 
-  const handleUploadClick = () => {
+  const handleWriteClick = () => {
     if (!user) {
-      alert("영상을 업로드하려면 로그인이 필요합니다.");
+      alert("글을 작성하려면 로그인이 필요합니다.");
       navigate("/login");
       return;
     }
-    navigate("/karaoke/upload");
+    navigate("/philosophy/write");
   };
 
   const handleLike = async (e, postId) => {
-    e.stopPropagation();
+    e.stopPropagation(); // 이벤트 버블링 방지
     
     if (!user) {
       alert("좋아요를 누르려면 로그인이 필요합니다.");
@@ -72,6 +82,7 @@ const Karaoke = () => {
     try {
       const isLiked = await toggleLike(postId, user.uid);
       
+      // 로컬 상태 업데이트
       setPosts(prev => prev.map(post => {
         if (post.id === postId) {
           return {
@@ -116,6 +127,8 @@ const Karaoke = () => {
     setSelectedUser(null);
   };
 
+  console.log("PhilosophyBoard 렌더링 - 상태:", { loading, error, postsCount: posts.length, user: !!user });
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
@@ -123,7 +136,7 @@ const Karaoke = () => {
           <div className="max-w-4xl mx-auto px-4">
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-700 mx-auto mb-4"></div>
-              <p className="text-amber-700">노래자랑 영상을 불러오는 중...</p>
+              <p className="text-amber-700">개똥철학을 불러오는 중...</p>
             </div>
           </div>
         </main>
@@ -139,7 +152,7 @@ const Karaoke = () => {
             <div className="text-center py-12">
               <p className="text-red-600 text-lg mb-4">{error}</p>
               <button
-                onClick={loadKaraokePosts}
+                onClick={loadPhilosophyPosts}
                 className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
               >
                 다시 시도
@@ -157,106 +170,42 @@ const Karaoke = () => {
         <div className="max-w-4xl mx-auto px-4">
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
-              <h1 className="text-2xl font-bold text-gray-800">노래자랑</h1>
+              <h1 className="text-2xl font-bold text-gray-800">개똥철학</h1>
               <button
-                onClick={handleUploadClick}
+                onClick={handleWriteClick}
                 className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center space-x-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                <span>업로드</span>
+                <span>글쓰기</span>
               </button>
             </div>
-                           <p className="text-gray-600">노래자랑 영상을 공유하고 소통해보세요</p>
+            <p className="text-gray-600">책에는 없는 나만의 철학을 공유해요</p>
           </div>
 
           {posts.length === 0 ? (
             <div className="text-center py-12">
-              <div className="text-gray-400 text-6xl mb-4">🎤</div>
-                             <p className="text-gray-600 text-lg mb-2">아직 노래자랑 영상이 없습니다</p>
-                             <p className="text-gray-500 mb-6">첫 번째 노래자랑 영상을 업로드해보세요!</p>
+              <div className="text-gray-400 text-6xl mb-4">📚</div>
+              <p className="text-gray-600 text-lg mb-2">아직 개똥철학 게시글이 없습니다</p>
+              <p className="text-gray-500 mb-6">첫 번째 개똥철학 이야기를 시작해보세요!</p>
               <button
-                onClick={handleUploadClick}
+                onClick={handleWriteClick}
                 className="bg-amber-600 text-white px-6 py-3 rounded-lg hover:bg-amber-700 transition-colors"
               >
-                                 노래자랑 영상 업로드하기
+                개똥철학 작성하기
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-4">
               {posts.map((post) => (
                 <div
                   key={post.id}
                   onClick={() => handlePostClick(post.id)}
-                  className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transform transition-transform hover:scale-105 hover:shadow-lg"
+                  className="bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-shadow"
                 >
-                  <div className="relative">
-                    <div className="w-full h-48 bg-gray-200 flex items-center justify-center relative overflow-hidden">
-                      <video
-                        src={post.videoUrl}
-                        className="w-full h-full object-cover"
-                        muted
-                        preload="metadata"
-                        poster=""
-                        onLoadedMetadata={(e) => {
-                          // 동영상 메타데이터 로드 후 첫 번째 프레임을 썸네일로 사용
-                          const video = e.target;
-                          const canvas = document.createElement('canvas');
-                          canvas.width = video.videoWidth;
-                          canvas.height = video.videoHeight;
-                          const ctx = canvas.getContext('2d');
-                          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                          video.style.backgroundImage = `url(${canvas.toDataURL()})`;
-                          video.style.backgroundSize = 'cover';
-                          video.style.backgroundPosition = 'center';
-                        }}
-                        onMouseOver={async (e) => {
-                          try {
-                            await e.target.play();
-                          } catch (error) {
-                            // AbortError는 무시 (사용자가 빠르게 마우스를 움직일 때 발생)
-                            if (error.name !== 'AbortError') {
-                              console.error('비디오 재생 오류:', error);
-                            }
-                          }
-                        }}
-                        onMouseOut={(e) => {
-                          try {
-                            e.target.pause();
-                            e.target.currentTime = 0;
-                          } catch (error) {
-                            console.error('비디오 일시정지 오류:', error);
-                          }
-                        }}
-                      />
-                      <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
-                        <div className="bg-white bg-opacity-20 rounded-full p-3 backdrop-blur-sm">
-                          <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                      </div>
-                      <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded flex items-center space-x-1">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
-                        </svg>
-                        <span>노래자랑</span>
-                      </div>
-                    </div>
-                    <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded flex items-center space-x-1">
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
-                      </svg>
-                      <span>{formatDate(post.createdAt)}</span>
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-gray-800 mb-2 line-clamp-2">{post.title}</h3>
-                    {post.description && (
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">{post.description}</p>
-                    )}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                  <div className="mb-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                       <div className="flex flex-col">
                         <span className="text-gray-500 text-xs mb-1">작성자</span>
                         <span 
@@ -271,18 +220,8 @@ const Karaoke = () => {
                         </span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-gray-500 text-xs mb-1">좋아요</span>
-                        <button
-                          onClick={(e) => handleLike(e, post.id)}
-                          className={`flex items-center space-x-1 transition-colors ${
-                            isLikedByUser(post) ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
-                          }`}
-                        >
-                          <svg className="w-4 h-4" fill={isLikedByUser(post) ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                          </svg>
-                          <span className={isLikedByUser(post) ? "text-red-500 font-semibold" : "text-gray-600"}>{post.likes || 0}</span>
-                        </button>
+                        <span className="text-gray-500 text-xs mb-1">작성일</span>
+                        <span className="text-gray-600">{formatDate(post.createdAt)}</span>
                       </div>
                       <div className="flex flex-col">
                         <span className="text-gray-500 text-xs mb-1">조회수</span>
@@ -294,7 +233,30 @@ const Karaoke = () => {
                           <span className="text-gray-600">{post.views || 0}</span>
                         </div>
                       </div>
+                      <div className="flex flex-col">
+                        <span className="text-gray-500 text-xs mb-1">좋아요</span>
+                        <div className="flex items-center space-x-1">
+                          <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                          </svg>
+                          <span className="text-gray-600">{post.likes || 0}</span>
+                        </div>
+                      </div>
                     </div>
+                  </div>
+                  
+                  <h2 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2">
+                    {post.title}
+                  </h2>
+                  
+                  <p className="text-gray-700 mb-4 line-clamp-3">
+                    {post.content}
+                  </p>
+                  
+                  <div className="flex items-center justify-end">
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
                   </div>
                 </div>
               ))}
@@ -314,4 +276,4 @@ const Karaoke = () => {
   );
 };
 
-export default Karaoke;
+export default PhilosophyBoard;

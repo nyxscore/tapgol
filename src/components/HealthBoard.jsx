@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getHealthPosts, toggleLike, incrementViews } from "../util/healthService";
+import UserProfileModal from './UserProfileModal';
 
 const HealthBoard = () => {
   const navigate = useNavigate();
@@ -11,6 +12,10 @@ const HealthBoard = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // 프로필 모달 관련 상태
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
     console.log("HealthBoard 컴포넌트 마운트");
@@ -112,6 +117,17 @@ const HealthBoard = () => {
     return user && post.likedBy?.includes(user.uid);
   };
 
+  // 프로필 관련 함수들
+  const handleShowProfile = (userId, userName) => {
+    setSelectedUser({ id: userId, name: userName });
+    setShowProfileModal(true);
+  };
+
+  const handleCloseProfileModal = () => {
+    setShowProfileModal(false);
+    setSelectedUser(null);
+  };
+
   const getCategoryColor = (category) => {
     const colors = {
       '일반': 'bg-gray-100 text-gray-800',
@@ -208,10 +224,19 @@ const HealthBoard = () => {
                         {post.category}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                       <div className="flex flex-col">
                         <span className="text-gray-500 text-xs mb-1">작성자</span>
-                        <span className="font-medium text-gray-800">{post.author}</span>
+                        <span 
+                          className="font-medium text-gray-800 hover:text-amber-600 cursor-pointer transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleShowProfile(post.authorId, post.author);
+                          }}
+                          title="프로필 보기"
+                        >
+                          {post.author}
+                        </span>
                       </div>
                       <div className="flex flex-col">
                         <span className="text-gray-500 text-xs mb-1">작성일</span>
@@ -227,6 +252,15 @@ const HealthBoard = () => {
                           <span className="text-gray-600">{post.views || 0}</span>
                         </div>
                       </div>
+                      <div className="flex flex-col">
+                        <span className="text-gray-500 text-xs mb-1">좋아요</span>
+                        <div className="flex items-center space-x-1">
+                          <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                          </svg>
+                          <span className="text-gray-600">{post.likes || 0}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   
@@ -238,21 +272,7 @@ const HealthBoard = () => {
                     {post.content}
                   </p>
                   
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <span className="text-gray-500 text-xs mb-1">좋아요</span>
-                      <button
-                        onClick={(e) => handleLike(e, post.id)}
-                        className={`flex items-center space-x-1 transition-colors ${
-                          isLikedByUser(post) ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
-                        }`}
-                      >
-                        <svg className="w-4 h-4" fill={isLikedByUser(post) ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                        </svg>
-                        <span className={isLikedByUser(post) ? "text-red-500 font-semibold" : ""}>{post.likes || 0}</span>
-                      </button>
-                    </div>
+                  <div className="flex items-center justify-end">
                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
@@ -263,6 +283,14 @@ const HealthBoard = () => {
           )}
         </div>
       </main>
+
+      {/* 사용자 프로필 모달 */}
+      <UserProfileModal
+        isOpen={showProfileModal}
+        onClose={handleCloseProfileModal}
+        userId={selectedUser?.id}
+        userName={selectedUser?.name}
+      />
     </div>
   );
 };

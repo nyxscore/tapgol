@@ -1,46 +1,50 @@
 // src/App.jsx
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { BrowserRouter as Router, Routes, Route, Outlet } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
 import ErrorBoundary from "./components/ErrorBoundary";
-import HomePage from "./components/HomePage";
-import Board from "./components/Board";
-import BoardWrite from "./components/BoardWrite";
-import BoardDetail from "./components/BoardDetail";
-import BoardEdit from "./components/BoardEdit";
-import Gallery from "./components/Gallery";
-import GalleryUpload from "./components/GalleryUpload";
-import GalleryDetail from "./components/GalleryDetail";
+const HomePage = lazy(() => import("./components/HomePage"));
+const Board = lazy(() => import("./components/Board"));
+const BoardWrite = lazy(() => import("./components/BoardWrite"));
+const BoardDetail = lazy(() => import("./components/BoardDetail"));
+const BoardEdit = lazy(() => import("./components/BoardEdit"));
+const Gallery = lazy(() => import("./components/Gallery"));
+const GalleryUpload = lazy(() => import("./components/GalleryUpload"));
+const GalleryDetail = lazy(() => import("./components/GalleryDetail"));
 import Header from "./components/Header";
 import BottomNavigation from "./components/BottomNavigation";
-import Login from "./components/Login";
-import Signup from "./components/Signup";
-import Profile from "./components/Profile";
-import Chat from "./components/Chat";
-import Community from "./components/Community";
-import Events from "./components/Events";
-import Karaoke from "./components/Karaoke";
-import KaraokeUpload from "./components/KaraokeUpload";
-import KaraokeDetail from "./components/KaraokeDetail";
-import Cooking from "./components/Cooking";
-import CookingWrite from "./components/CookingWrite";
-import CookingDetail from "./components/CookingDetail";
-import CookingEdit from "./components/CookingEdit";
-import HealthBoard from "./components/HealthBoard";
-import HealthWrite from "./components/HealthWrite";
-import HealthDetail from "./components/HealthDetail";
-import HealthEdit from "./components/HealthEdit";
+const Login = lazy(() => import("./components/Login"));
+const Signup = lazy(() => import("./components/Signup"));
+const Profile = lazy(() => import("./components/Profile"));
+const Chat = lazy(() => import("./components/Chat"));
+const Community = lazy(() => import("./components/Community"));
+const Events = lazy(() => import("./components/Events"));
+const Karaoke = lazy(() => import("./components/Karaoke"));
+const KaraokeUpload = lazy(() => import("./components/KaraokeUpload"));
+const KaraokeDetail = lazy(() => import("./components/KaraokeDetail"));
+const Cooking = lazy(() => import("./components/Cooking"));
+const CookingWrite = lazy(() => import("./components/CookingWrite"));
+const CookingDetail = lazy(() => import("./components/CookingDetail"));
+const CookingEdit = lazy(() => import("./components/CookingEdit"));
+const HealthBoard = lazy(() => import("./components/HealthBoard"));
+const HealthWrite = lazy(() => import("./components/HealthWrite"));
+const HealthDetail = lazy(() => import("./components/HealthDetail"));
+const HealthEdit = lazy(() => import("./components/HealthEdit"));
+const PhilosophyBoard = lazy(() => import("./components/PhilosophyBoard"));
+const PhilosophyWrite = lazy(() => import("./components/PhilosophyWrite"));
+const PhilosophyDetail = lazy(() => import("./components/PhilosophyDetail"));
 
-import Alerts from "./components/Alerts";
-import NotificationBoard from "./components/NotificationBoard";
+const Alerts = lazy(() => import("./components/Alerts"));
+const NotificationBoard = lazy(() => import("./components/NotificationBoard"));
 
 
-import Marketplace from "./components/Marketplace";
-import MarketplaceWrite from "./components/MarketplaceWrite";
-import MarketplaceDetail from "./components/MarketplaceDetail";
-import MarketplaceEdit from "./components/MarketplaceEdit";
-import ReportManagement from "./components/ReportManagement";
+const Marketplace = lazy(() => import("./components/Marketplace"));
+const MarketplaceWrite = lazy(() => import("./components/MarketplaceWrite"));
+const MarketplaceDetail = lazy(() => import("./components/MarketplaceDetail"));
+const MarketplaceEdit = lazy(() => import("./components/MarketplaceEdit"));
+const ReportManagement = lazy(() => import("./components/ReportManagement"));
+const AdminPanel = lazy(() => import("./components/AdminPanel"));
 
 // 메인 레이아웃 컴포넌트
 function MainLayout() {
@@ -63,47 +67,49 @@ export default function App() {
       <AuthProvider>
         <NotificationsProvider>
           <Router>
-            <Routes>
-              <Route element={<MainLayout />}>
-                <Route index element={<HomePage />} />
-                <Route path="/board" element={<Board />} />
-                <Route path="/board/write" element={<BoardWrite />} />
-                <Route path="/board/:id" element={<BoardDetail />} />
-                <Route path="/board/edit/:id" element={<BoardEdit />} />
-                <Route path="/gallery" element={<Gallery />} />
-                <Route path="/gallery/upload" element={<GalleryUpload />} />
-                <Route path="/gallery/:id" element={<GalleryDetail />} />
-                <Route path="/chat" element={<Chat />} />
-                <Route path="/chat/main" element={<Chat />} />
-                <Route path="/community" element={<Community />} />
-                <Route path="/events" element={<Events />} />
-                <Route path="/karaoke" element={<Karaoke />} />
-                <Route path="/karaoke/upload" element={<KaraokeUpload />} />
-                <Route path="/karaoke/:id" element={<KaraokeDetail />} />
-                <Route path="/cooking" element={<Cooking />} />
-                <Route path="/cooking/write" element={<CookingWrite />} />
-                <Route path="/cooking/:id" element={<CookingDetail />} />
-                <Route path="/cooking/edit/:id" element={<CookingEdit />} />
-                <Route path="/health" element={<HealthBoard />} />
-                <Route path="/health/write" element={<HealthWrite />} />
-                <Route path="/health/:id" element={<HealthDetail />} />
-                <Route path="/health/edit/:id" element={<HealthEdit />} />
-
-
-                <Route path="/alerts" element={<Alerts />} />
-                <Route path="/notification-board" element={<NotificationBoard />} />
-
-
-                <Route path="/marketplace" element={<Marketplace />} />
-                <Route path="/marketplace/write" element={<MarketplaceWrite />} />
-                <Route path="/marketplace/:id" element={<MarketplaceDetail />} />
-                <Route path="/marketplace/edit/:id" element={<MarketplaceEdit />} />
-                <Route path="/reports" element={<ReportManagement />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
-                <Route path="/profile" element={<Profile />} />
-              </Route>
-            </Routes>
+            <Suspense fallback={<div className="p-8 text-center text-amber-700">로딩 중...</div>}>
+              <Routes>
+                <Route element={<MainLayout />}>
+                  <Route index element={<HomePage />} />
+                  <Route path="/board" element={<Board />} />
+                  <Route path="/board/write" element={<BoardWrite />} />
+                  <Route path="/board/:id" element={<BoardDetail />} />
+                  <Route path="/board/edit/:id" element={<BoardEdit />} />
+                  <Route path="/gallery" element={<Gallery />} />
+                  <Route path="/gallery/upload" element={<GalleryUpload />} />
+                  <Route path="/gallery/:id" element={<GalleryDetail />} />
+                  <Route path="/chat" element={<Chat />} />
+                  <Route path="/chat/main" element={<Chat />} />
+                  <Route path="/community" element={<Community />} />
+                  <Route path="/events" element={<Events />} />
+                  <Route path="/karaoke" element={<Karaoke />} />
+                  <Route path="/karaoke/upload" element={<KaraokeUpload />} />
+                  <Route path="/karaoke/:id" element={<KaraokeDetail />} />
+                  <Route path="/cooking" element={<Cooking />} />
+                  <Route path="/cooking/write" element={<CookingWrite />} />
+                  <Route path="/cooking/:id" element={<CookingDetail />} />
+                  <Route path="/cooking/edit/:id" element={<CookingEdit />} />
+                  <Route path="/health" element={<HealthBoard />} />
+                  <Route path="/health/write" element={<HealthWrite />} />
+                  <Route path="/health/:id" element={<HealthDetail />} />
+                  <Route path="/health/edit/:id" element={<HealthEdit />} />
+                  <Route path="/philosophy" element={<PhilosophyBoard />} />
+                  <Route path="/philosophy/write" element={<PhilosophyWrite />} />
+                  <Route path="/philosophy/:id" element={<PhilosophyDetail />} />
+                  <Route path="/alerts" element={<Alerts />} />
+                  <Route path="/notification-board" element={<NotificationBoard />} />
+                  <Route path="/marketplace" element={<Marketplace />} />
+                  <Route path="/marketplace/write" element={<MarketplaceWrite />} />
+                  <Route path="/marketplace/:id" element={<MarketplaceDetail />} />
+                  <Route path="/marketplace/edit/:id" element={<MarketplaceEdit />} />
+                  <Route path="/reports" element={<ReportManagement />} />
+                  <Route path="/admin" element={<AdminPanel />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/signup" element={<Signup />} />
+                  <Route path="/profile" element={<Profile />} />
+                </Route>
+              </Routes>
+            </Suspense>
           </Router>
         </NotificationsProvider>
       </AuthProvider>

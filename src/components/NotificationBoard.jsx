@@ -12,6 +12,7 @@ import {
   updateNotification,
   deleteNotification
 } from "../util/notificationService";
+import UserProfileModal from './UserProfileModal';
 
 const NotificationBoard = () => {
   const navigate = useNavigate();
@@ -31,6 +32,10 @@ const NotificationBoard = () => {
   });
   const [editingId, setEditingId] = useState(null);
   const unsubscribeRef = useRef(null);
+  
+  // 프로필 모달 관련 상태
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -221,6 +226,17 @@ const NotificationBoard = () => {
     });
   };
 
+  // 프로필 관련 함수들
+  const handleShowProfile = (userId, userName) => {
+    setSelectedUser({ id: userId, name: userName });
+    setShowProfileModal(true);
+  };
+
+  const handleCloseProfileModal = () => {
+    setShowProfileModal(false);
+    setSelectedUser(null);
+  };
+
   const getCategoryLabel = (category) => {
     const categories = {
       update: "업데이트",
@@ -399,7 +415,13 @@ const NotificationBoard = () => {
                   
                   <div className="mt-6 pt-4 border-t border-gray-200">
                     <p className="text-sm text-gray-500">
-                      작성자: {selectedNotification.author}
+                      작성자: <span 
+                        className="text-gray-700 hover:text-amber-600 cursor-pointer transition-colors"
+                        onClick={() => handleShowProfile(selectedNotification.authorId, selectedNotification.author)}
+                        title="프로필 보기"
+                      >
+                        {selectedNotification.author}
+                      </span>
                     </p>
                   </div>
                 </div>
@@ -518,6 +540,14 @@ const NotificationBoard = () => {
           )}
         </div>
       </main>
+
+      {/* 사용자 프로필 모달 */}
+      <UserProfileModal
+        isOpen={showProfileModal}
+        onClose={handleCloseProfileModal}
+        userId={selectedUser?.id}
+        userName={selectedUser?.name}
+      />
     </div>
   );
 };

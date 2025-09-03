@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { getMarketplacePost, updateMarketplacePost, deleteMarketplacePost, incrementViews, toggleSoldStatus } from '../util/marketplaceService';
 import { FaArrowLeft, FaEdit, FaTrash, FaPhone, FaComment, FaHeart, FaShare } from 'react-icons/fa';
 import CommentSection from './CommentSection';
+import UserProfileModal from './UserProfileModal';
 
 const MarketplaceDetail = () => {
   const [post, setPost] = useState(null);
@@ -15,6 +16,10 @@ const MarketplaceDetail = () => {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  
+  // 프로필 모달 관련 상태
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   const categories = [
     { value: 'electronics', label: '전자제품' },
@@ -118,6 +123,17 @@ const MarketplaceDetail = () => {
     setImageError(prev => ({ ...prev, [imageIndex]: true }));
   };
 
+  // 프로필 관련 함수들
+  const handleShowProfile = (userId, userName) => {
+    setSelectedUser({ id: userId, name: userName });
+    setShowProfileModal(true);
+  };
+
+  const handleCloseProfileModal = () => {
+    setShowProfileModal(false);
+    setSelectedUser(null);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -155,10 +171,12 @@ const MarketplaceDetail = () => {
           <div className="flex items-center justify-between mb-4">
             <button
               onClick={() => navigate('/marketplace')}
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
+              className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110"
+              title="목록으로 돌아가기"
             >
-              <FaArrowLeft />
-              목록으로
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+              </svg>
             </button>
             {user && post.authorId === user.uid && (
               <div className="flex gap-2">
@@ -282,7 +300,13 @@ const MarketplaceDetail = () => {
           <h2 className="text-xl font-semibold text-gray-800 mb-4">판매자 정보</h2>
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium text-gray-800">{post.author || '익명'}</p>
+              <p 
+                className="font-medium text-gray-800 hover:text-amber-600 cursor-pointer transition-colors"
+                onClick={() => handleShowProfile(post.authorId, post.author || '익명')}
+                title="프로필 보기"
+              >
+                {post.author || '익명'}
+              </p>
               <p className="text-sm text-gray-500">{post.location || '위치 미설정'}</p>
             </div>
             <div className="flex gap-2">
@@ -350,6 +374,14 @@ const MarketplaceDetail = () => {
             </div>
           </div>
         )}
+
+        {/* 사용자 프로필 모달 */}
+        <UserProfileModal
+          isOpen={showProfileModal}
+          onClose={handleCloseProfileModal}
+          userId={selectedUser?.id}
+          userName={selectedUser?.name}
+        />
       </div>
     </div>
   );

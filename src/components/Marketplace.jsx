@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getMarketplacePosts } from '../util/marketplaceService';
 import { FaPlus, FaSearch, FaFilter } from 'react-icons/fa';
+import UserProfileModal from './UserProfileModal';
 
 const Marketplace = () => {
   const [posts, setPosts] = useState([]);
@@ -12,6 +13,10 @@ const Marketplace = () => {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // 프로필 모달 관련 상태
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   const categories = [
     { value: 'all', label: '전체' },
@@ -87,6 +92,17 @@ const Marketplace = () => {
   const handleImageError = (e) => {
     e.target.style.display = 'none';
     e.target.nextSibling.style.display = 'flex';
+  };
+
+  // 프로필 관련 함수들
+  const handleShowProfile = (userId, userName) => {
+    setSelectedUser({ id: userId, name: userName });
+    setShowProfileModal(true);
+  };
+
+  const handleCloseProfileModal = () => {
+    setShowProfileModal(false);
+    setSelectedUser(null);
   };
 
   if (loading) {
@@ -233,6 +249,19 @@ const Marketplace = () => {
                       <span className="text-gray-500 text-xs mb-1">등록일</span>
                       <span className="text-gray-600">{formatDate(post.createdAt)}</span>
                     </div>
+                    <div className="flex flex-col">
+                      <span className="text-gray-500 text-xs mb-1">작성자</span>
+                      <span 
+                        className="text-gray-600 hover:text-amber-600 cursor-pointer transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleShowProfile(post.authorId, post.author || "익명");
+                        }}
+                        title="프로필 보기"
+                      >
+                        {post.author || "익명"}
+                      </span>
+                    </div>
                   </div>
                   {post.category && (
                     <div className="mt-2">
@@ -247,6 +276,14 @@ const Marketplace = () => {
           </div>
         )}
       </div>
+
+      {/* 사용자 프로필 모달 */}
+      <UserProfileModal
+        isOpen={showProfileModal}
+        onClose={handleCloseProfileModal}
+        userId={selectedUser?.id}
+        userName={selectedUser?.name}
+      />
     </div>
   );
 };

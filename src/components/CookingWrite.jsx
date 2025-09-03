@@ -82,7 +82,7 @@ const CookingWrite = () => {
               <button
                 onClick={() => navigate('/cooking')}
                 className="text-gray-600 hover:text-gray-800 transition-colors"
-                title="요리노하우로 돌아가기"
+                title="나만의요리로 돌아가기"
               >
                 <FaArrowLeft className="w-6 h-6" />
               </button>

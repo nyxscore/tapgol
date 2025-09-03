@@ -3,12 +3,17 @@ import { Link, useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getPosts } from "../util/postService";
+import UserProfileModal from './UserProfileModal';
 
 const Board = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
+
+  // 프로필 모달 관련 상태
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
     // 로그인 상태 확인
@@ -87,6 +92,17 @@ const Board = () => {
     return user && post.likedBy && post.likedBy.includes(user.uid);
   };
 
+  // 프로필 관련 함수들
+  const handleShowProfile = (userId, userName) => {
+    setSelectedUser({ id: userId, name: userName });
+    setShowProfileModal(true);
+  };
+
+  const handleCloseProfileModal = () => {
+    setShowProfileModal(false);
+    setSelectedUser(null);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center">
@@ -158,7 +174,16 @@ const Board = () => {
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs mb-1">작성자</span>
-                          <span className="font-medium text-gray-800">{post.author}</span>
+                          <span 
+                            className="font-medium text-gray-800 hover:text-amber-600 cursor-pointer transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleShowProfile(post.authorId, post.author);
+                            }}
+                            title="프로필 보기"
+                          >
+                            {post.author}
+                          </span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs mb-1">작성일</span>
@@ -225,6 +250,14 @@ const Board = () => {
           )}
         </div>
       </div>
+
+      {/* 사용자 프로필 모달 */}
+      <UserProfileModal
+        isOpen={showProfileModal}
+        onClose={handleCloseProfileModal}
+        userId={selectedUser?.id}
+        userName={selectedUser?.name}
+      />
     </div>
   );
 };

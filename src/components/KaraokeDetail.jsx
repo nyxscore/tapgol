@@ -7,6 +7,7 @@ import { getKaraokePost, incrementViews, toggleLike, deleteKaraokePost } from ".
 import { markNotificationsByPostIdAsRead } from "../util/notificationService";
 import { formatTextWithLinks } from "../util/textUtils.jsx";
 import CommentSection from "./CommentSection";
+import UserProfileModal from "./UserProfileModal";
 
 const KaraokeDetail = () => {
   const { id } = useParams();
@@ -17,6 +18,10 @@ const KaraokeDetail = () => {
   const [error, setError] = useState(null);
   const [isLiked, setIsLiked] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  
+  // 프로필 모달 관련 상태
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -139,6 +144,17 @@ const KaraokeDetail = () => {
     navigate(`/karaoke/edit/${id}`);
   };
 
+  // 프로필 관련 함수들
+  const handleShowProfile = (userId, userName) => {
+    setSelectedUser({ id: userId, name: userName });
+    setShowProfileModal(true);
+  };
+
+  const handleCloseProfileModal = () => {
+    setShowProfileModal(false);
+    setSelectedUser(null);
+  };
+
   const formatDate = (timestamp) => {
     if (!timestamp) return "";
     
@@ -179,8 +195,11 @@ const KaraokeDetail = () => {
               <button
                 onClick={() => navigate("/karaoke")}
                 className="bg-amber-600 text-white px-6 py-3 rounded-lg hover:bg-amber-700 transition-colors"
+                title="노래자랑으로 돌아가기"
               >
-                노래자랑으로 돌아가기
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
               </button>
             </div>
           </div>
@@ -196,12 +215,12 @@ const KaraokeDetail = () => {
           {/* Back Button */}
           <button
             onClick={() => navigate("/karaoke")}
-            className="mb-4 flex items-center text-gray-600 hover:text-gray-800 transition-colors"
+            className="mb-4 flex items-center justify-center w-12 h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110"
+            title="노래자랑으로 돌아가기"
           >
-            <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
-                         노래자랑으로 돌아가기
           </button>
 
           {/* Video Player */}
@@ -237,7 +256,13 @@ const KaraokeDetail = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm mb-3">
                   <div className="flex flex-col">
                     <span className="text-gray-500 text-xs mb-1">작성자</span>
-                    <span className="font-medium text-gray-800">{post.author}</span>
+                    <span 
+                      className="font-medium text-gray-800 hover:text-amber-600 cursor-pointer transition-colors"
+                      onClick={() => handleShowProfile(post.authorId, post.author)}
+                      title="프로필 보기"
+                    >
+                      {post.author}
+                    </span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-gray-500 text-xs mb-1">업로드일</span>
@@ -306,6 +331,14 @@ const KaraokeDetail = () => {
           </div>
         </div>
       </main>
+
+      {/* 사용자 프로필 모달 */}
+      <UserProfileModal
+        isOpen={showProfileModal}
+        onClose={handleCloseProfileModal}
+        userId={selectedUser?.id}
+        userName={selectedUser?.name}
+      />
     </div>
   );
 };

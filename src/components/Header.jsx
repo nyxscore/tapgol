@@ -3,10 +3,12 @@ import { Link, useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { getUserProfile } from "../util/userService";
+import { checkAdminRole } from "../util/reportService";
 
 const Header = () => {
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -19,6 +21,10 @@ const Header = () => {
         try {
           const profile = await getUserProfile(currentUser.uid);
           setUserData(profile);
+          
+          // 관리자 권한 확인
+          const adminStatus = await checkAdminRole(currentUser.uid);
+          setIsAdmin(adminStatus);
         } catch (error) {
           console.error("사용자 정보 로드 오류:", error);
           // 기본 정보만 사용
@@ -26,11 +32,13 @@ const Header = () => {
             name: currentUser.displayName || "사용자",
             nickname: currentUser.displayName || "사용자"
           });
+          setIsAdmin(false);
         }
-      } else {
-        setUser(null);
-        setUserData(null);
-      }
+              } else {
+          setUser(null);
+          setUserData(null);
+          setIsAdmin(false);
+        }
       setLoading(false);
     });
 
@@ -104,6 +112,18 @@ const Header = () => {
           {/* 로그인/내 정보/로그아웃 버튼 */}
           {user ? (
             <div className="flex items-center space-x-3">
+              {/* 관리자 패널 링크 */}
+              {isAdmin && (
+                <Link
+                  to="/admin"
+                  className="px-4 py-2 rounded-full bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors flex items-center space-x-2"
+                  title="관리자 패널"
+                >
+                  <span className="text-lg">👑</span>
+                  <span>관리자</span>
+                </Link>
+              )}
+              
               <Link
                 to="/profile"
                 className="flex items-center space-x-2 px-4 py-2 rounded-full bg-amber-100 text-amber-900 font-semibold hover:bg-amber-200 transition-colors"

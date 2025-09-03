@@ -87,10 +87,6 @@ const Login = () => {
           errorMessage = "비밀번호가 올바르지 않습니다. 비밀번호를 다시 확인해주세요.";
           errorType = "error";
           break;
-        case "auth/invalid-credential":
-          errorMessage = "이메일 또는 비밀번호가 올바르지 않습니다. 다시 확인해주세요.";
-          errorType = "error";
-          break;
         case "auth/invalid-email":
           errorMessage = "유효하지 않은 이메일 형식입니다. 이메일 형식을 확인해주세요.";
           errorType = "error";

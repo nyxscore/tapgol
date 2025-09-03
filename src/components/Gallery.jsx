@@ -3,12 +3,17 @@ import { useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getGalleryItems, toggleLike, incrementViews } from "../util/galleryService";
+import UserProfileModal from './UserProfileModal';
 
 const Gallery = () => {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // 프로필 모달 관련 상태
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -95,7 +100,18 @@ const Gallery = () => {
   };
 
   const isLikedByUser = (item) => {
-    return user && item.likedBy?.includes(user.uid);
+    return user && item.likedBy && item.likedBy.includes(user.uid);
+  };
+
+  // 프로필 관련 함수들
+  const handleShowProfile = (userId, userName) => {
+    setSelectedUser({ id: userId, name: userName });
+    setShowProfileModal(true);
+  };
+
+  const handleCloseProfileModal = () => {
+    setShowProfileModal(false);
+    setSelectedUser(null);
   };
 
   const getFileTypeIcon = (fileType) => {
@@ -233,7 +249,16 @@ const Gallery = () => {
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
                       <div className="flex flex-col">
                         <span className="text-gray-500 text-xs mb-1">업로더</span>
-                        <span className="font-medium text-gray-800">{item.uploader}</span>
+                        <span 
+                          className="font-medium text-gray-800 hover:text-amber-600 cursor-pointer transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleShowProfile(item.uploaderId, item.uploader);
+                          }}
+                          title="프로필 보기"
+                        >
+                          {item.uploader}
+                        </span>
                       </div>
                       <div className="flex flex-col">
                         <span className="text-gray-500 text-xs mb-1">좋아요</span>
@@ -267,6 +292,14 @@ const Gallery = () => {
           )}
         </div>
       </main>
+
+      {/* 사용자 프로필 모달 */}
+      <UserProfileModal
+        isOpen={showProfileModal}
+        onClose={handleCloseProfileModal}
+        userId={selectedUser?.id}
+        userName={selectedUser?.name}
+      />
     </div>
   );
 };

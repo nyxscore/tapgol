@@ -123,8 +123,11 @@ const CookingEdit = () => {
               <button
                 onClick={() => navigate('/cooking')}
                 className="px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+                title="나만의요리로 돌아가기"
               >
-                요리노하우로 돌아가기
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
               </button>
             </div>
           </div>

@@ -3,12 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, orderBy, query } from 'firebase/firestore';
 import { db } from '../util/firebase';
 import { FaPlus, FaSearch } from 'react-icons/fa';
+import UserProfileModal from './UserProfileModal';
 
 const Cooking = () => {
   const navigate = useNavigate();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // 프로필 모달 관련 상태
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
     loadPosts();
@@ -39,6 +44,17 @@ const Cooking = () => {
     post.author?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // 프로필 관련 함수들
+  const handleShowProfile = (userId, userName) => {
+    setSelectedUser({ id: userId, name: userName });
+    setShowProfileModal(true);
+  };
+
+  const handleCloseProfileModal = () => {
+    setShowProfileModal(false);
+    setSelectedUser(null);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
@@ -62,7 +78,7 @@ const Cooking = () => {
           <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">요리노하우 👨‍🍳</h1>
+                <h1 className="text-2xl font-bold text-gray-800">나만의요리 👨‍🍳</h1>
                 <p className="text-gray-600 mt-1">맛있는 요리 레시피와 요리 팁을 공유해보세요</p>
               </div>
               <button
@@ -124,7 +140,16 @@ const Cooking = () => {
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
                             <span className="text-gray-500">작성자</span>
-                            <div className="font-medium text-gray-700">{post.author || "익명"}</div>
+                            <div 
+                              className="font-medium text-gray-700 hover:text-amber-600 cursor-pointer transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleShowProfile(post.authorId, post.author || "익명");
+                              }}
+                              title="프로필 보기"
+                            >
+                              {post.author || "익명"}
+                            </div>
                           </div>
                           <div>
                             <span className="text-gray-500">작성일</span>
@@ -174,6 +199,14 @@ const Cooking = () => {
           </div>
         </div>
       </main>
+
+      {/* 사용자 프로필 모달 */}
+      <UserProfileModal
+        isOpen={showProfileModal}
+        onClose={handleCloseProfileModal}
+        userId={selectedUser?.id}
+        userName={selectedUser?.name}
+      />
     </div>
   );
 };

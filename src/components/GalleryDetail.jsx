@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { auth } from "../util/firebase";
+import { auth, db } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { getGalleryItem, incrementViews, deleteGalleryItem, toggleLike } from "../util/galleryService";
+import { getGalleryItem, incrementViews, deleteGalleryItem, toggleLike, updateGalleryItem } from "../util/galleryService";
 import { markNotificationsByPostIdAsRead } from "../util/notificationService";
 import { formatTextWithLinks } from "../util/textUtils.jsx";
 import CommentSection from "./CommentSection";
+import UserProfileModal from "./UserProfileModal";
 
 const GalleryDetail = () => {
   const { id } = useParams();
@@ -15,6 +16,14 @@ const GalleryDetail = () => {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [liking, setLiking] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+  
+  // 프로필 모달 관련 상태
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -50,19 +59,42 @@ const GalleryDetail = () => {
       try {
         setLoading(true);
         console.log(`갤러리 항목 로드 시도: ${id}`);
+        
+        // Firebase 연결 상태 확인
+        if (!db) {
+          console.error("Firebase DB 연결 실패: db 객체가 undefined입니다.");
+          throw new Error("Firebase 데이터베이스에 연결할 수 없습니다.");
+        }
+        
+        console.log("Firebase DB 연결 상태:", !!db);
+        console.log("Firebase Auth 연결 상태:", !!auth);
+        
         const itemData = await getGalleryItem(id);
         console.log("갤러리 항목 로드 성공:", itemData);
         setItem(itemData);
       } catch (error) {
         console.error("갤러리 항목 로드 오류:", error);
+        console.error("에러 코드:", error.code);
+        console.error("에러 메시지:", error.message);
+        console.error("에러 스택:", error.stack);
         setItem(null);
         
-        // 사용자에게 더 친화적인 메시지 표시
-        if (error.message === "갤러리 항목을 찾을 수 없습니다.") {
-          alert("요청하신 갤러리 항목을 찾을 수 없습니다. 삭제되었거나 잘못된 링크일 수 있습니다.");
-        } else {
-          alert("갤러리 항목을 불러오는데 실패했습니다. 잠시 후 다시 시도해주세요.");
+        // 에러 타입에 따른 사용자 메시지
+        let errorMessage = "갤러리 항목을 불러오는데 실패했습니다.";
+        
+        if (error.message === "추억앨범 항목을 찾을 수 없습니다.") {
+          errorMessage = "요청하신 갤러리 항목을 찾을 수 없습니다. 삭제되었거나 잘못된 링크일 수 있습니다.";
+        } else if (error.message.includes("Firebase")) {
+          errorMessage = "데이터베이스 연결에 문제가 있습니다. 잠시 후 다시 시도해주세요.";
+        } else if (error.code === "permission-denied") {
+          errorMessage = "접근 권한이 없습니다.";
+        } else if (error.code === "unavailable") {
+          errorMessage = "서비스가 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해주세요.";
+        } else if (error.code === "not-found") {
+          errorMessage = "데이터베이스를 찾을 수 없습니다.";
         }
+        
+        alert(errorMessage);
         
         // 2초 후 갤러리로 이동
         setTimeout(() => {
@@ -142,6 +174,62 @@ const GalleryDetail = () => {
     }
   };
 
+  const startEdit = () => {
+    setEditTitle(item.title || "");
+    setEditDescription(item.description || "");
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setEditTitle("");
+    setEditDescription("");
+  };
+
+  const handleSave = async () => {
+    if (!editTitle.trim()) {
+      alert("제목을 입력해주세요.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // 갤러리 서비스에서 수정 함수 호출
+      await updateGalleryItem(id, {
+        title: editTitle.trim(),
+        description: editDescription.trim(),
+        updatedAt: new Date()
+      });
+
+      // 로컬 상태 업데이트
+      setItem(prev => ({
+        ...prev,
+        title: editTitle.trim(),
+        description: editDescription.trim(),
+        updatedAt: new Date()
+      }));
+
+      setEditing(false);
+      alert("수정이 완료되었습니다.");
+    } catch (error) {
+      console.error("수정 오류:", error);
+      alert("수정에 실패했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 프로필 관련 함수들
+  const handleShowProfile = (userId, userName) => {
+    setSelectedUser({ id: userId, name: userName });
+    setShowProfileModal(true);
+  };
+
+  const handleCloseProfileModal = () => {
+    setShowProfileModal(false);
+    setSelectedUser(null);
+  };
+
   const handleLike = async () => {
     if (!user) {
       alert("좋아요를 누르려면 로그인이 필요합니다.");
@@ -199,12 +287,15 @@ const GalleryDetail = () => {
           <div className="text-gray-400 text-6xl mb-4">📄</div>
                         <p className="text-gray-600 text-lg mb-2">추억앨범 항목을 찾을 수 없습니다</p>
           <p className="text-gray-500 text-sm mb-4">삭제되었거나 잘못된 링크일 수 있습니다.</p>
-          <button
-            onClick={() => navigate("/gallery")}
-            className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors"
-          >
-            추억앨범으로 돌아가기
-          </button>
+                      <button
+              onClick={() => navigate("/gallery")}
+              className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors"
+              title="추억앨범으로 돌아가기"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
         </div>
       </div>
     );
@@ -218,14 +309,14 @@ const GalleryDetail = () => {
           <div className="flex items-center justify-between">
             <button
               onClick={() => navigate("/gallery")}
-              className="flex items-center text-amber-700 hover:text-amber-800 font-medium"
+              className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110"
+              title="추억앨범으로 돌아가기"
             >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
               </svg>
-              추억앨범으로 돌아가기
             </button>
-            <h1 className="text-2xl font-bold text-gray-800">추억앨범 상세</h1>
+            <h1 className="text-2xl font-bold text-gray-800">추억앨범</h1>
             <div className="w-24"></div>
           </div>
         </div>
@@ -235,9 +326,49 @@ const GalleryDetail = () => {
           {/* 항목 헤더 */}
           <div className="border-b border-gray-200 pb-6 mb-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-gray-800">{item.title}</h2>
+              {editing ? (
+                <div className="flex-1 mr-4">
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full text-2xl font-bold text-gray-800 border-b-2 border-blue-500 focus:outline-none focus:border-blue-600"
+                    placeholder="제목을 입력하세요"
+                  />
+                </div>
+              ) : (
+                <h2 className="text-2xl font-bold text-gray-800">{item.title}</h2>
+              )}
               {isAuthor && (
                 <div className="flex space-x-2">
+                  {editing ? (
+                    <>
+                      <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className={`px-3 py-1 rounded-lg transition-colors text-sm ${
+                          saving
+                            ? "bg-gray-400 text-white cursor-not-allowed"
+                            : "bg-green-500 text-white hover:bg-green-600"
+                        }`}
+                      >
+                        {saving ? "저장 중..." : "저장"}
+                      </button>
+                      <button
+                        onClick={cancelEdit}
+                        className="px-3 py-1 rounded-lg transition-colors text-sm bg-gray-500 text-white hover:bg-gray-600"
+                      >
+                        취소
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={startEdit}
+                      className="px-3 py-1 rounded-lg transition-colors text-sm bg-blue-500 text-white hover:bg-blue-600"
+                    >
+                      수정
+                    </button>
+                  )}
                   <button
                     onClick={handleDelete}
                     disabled={deleting}
@@ -256,7 +387,13 @@ const GalleryDetail = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
               <div className="flex flex-col">
                 <span className="text-gray-500 text-xs mb-1">업로더</span>
-                <span className="font-medium text-gray-800">{item.uploader}</span>
+                <span 
+                  className="font-medium text-gray-800 hover:text-amber-600 cursor-pointer transition-colors"
+                  onClick={() => handleShowProfile(item.uploaderId, item.uploader)}
+                  title="프로필 보기"
+                >
+                  {item.uploader}
+                </span>
               </div>
               <div className="flex flex-col">
                 <span className="text-gray-500 text-xs mb-1">업로드일</span>
@@ -320,16 +457,28 @@ const GalleryDetail = () => {
           </div>
 
           {/* 설명 */}
-          {item.description && (
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">설명</h3>
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">설명</h3>
+            {editing ? (
               <div className="bg-gray-50 rounded-lg p-4">
-                <div className="text-gray-700 whitespace-pre-wrap">
-                  {formatTextWithLinks(item.description)}
-                </div>
+                <textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  rows="4"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  placeholder="설명을 입력하세요"
+                />
               </div>
-            </div>
-          )}
+            ) : (
+              item.description && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="text-gray-700 whitespace-pre-wrap">
+                    {formatTextWithLinks(item.description)}
+                  </div>
+                </div>
+              )
+            )}
+          </div>
 
 
 
@@ -382,6 +531,14 @@ const GalleryDetail = () => {
           <CommentSection postId={id} boardType="gallery" />
         </div>
       </div>
+
+      {/* 사용자 프로필 모달 */}
+      <UserProfileModal
+        isOpen={showProfileModal}
+        onClose={handleCloseProfileModal}
+        userId={selectedUser?.id}
+        userName={selectedUser?.name}
+      />
     </div>
   );
 };

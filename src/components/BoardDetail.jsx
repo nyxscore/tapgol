@@ -6,6 +6,7 @@ import { getPost, incrementViews, deletePost, toggleLike } from "../util/postSer
 import { markNotificationsByPostIdAsRead } from "../util/notificationService";
 import { formatTextWithLinks } from "../util/textUtils.jsx";
 import CommentSection from "./CommentSection";
+import UserProfileModal from "./UserProfileModal";
 
 const BoardDetail = () => {
   const { id } = useParams();
@@ -15,6 +16,10 @@ const BoardDetail = () => {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [liking, setLiking] = useState(false);
+  
+  // 프로필 모달 관련 상태
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -101,6 +106,17 @@ const BoardDetail = () => {
     navigate(`/board/edit/${id}`);
   };
 
+  // 프로필 관련 함수들
+  const handleShowProfile = (userId, userName) => {
+    setSelectedUser({ id: userId, name: userName });
+    setShowProfileModal(true);
+  };
+
+  const handleCloseProfileModal = () => {
+    setShowProfileModal(false);
+    setSelectedUser(null);
+  };
+
   const handleLike = async () => {
     if (!user) {
       alert("좋아요를 누르려면 로그인이 필요합니다.");
@@ -156,12 +172,15 @@ const BoardDetail = () => {
         <div className="text-center">
           <div className="text-gray-400 text-6xl mb-4">📄</div>
           <p className="text-gray-600 text-lg mb-2">게시글을 찾을 수 없습니다</p>
-          <button
-            onClick={() => navigate("/board")}
-            className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors"
-          >
-            게시판으로 돌아가기
-          </button>
+                      <button
+              onClick={() => navigate("/board")}
+              className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors"
+              title="게시판으로 돌아가기"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
         </div>
       </div>
     );
@@ -177,12 +196,12 @@ const BoardDetail = () => {
           <div className="flex items-center justify-between">
             <button
               onClick={() => navigate("/board")}
-              className="flex items-center text-amber-700 hover:text-amber-800 font-medium"
+              className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110"
+              title="목록으로 돌아가기"
             >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
               </svg>
-              목록으로 돌아가기
             </button>
             <h1 className="text-2xl font-bold text-gray-800">모임게시판</h1>
             <div className="w-24"></div>
@@ -238,7 +257,13 @@ const BoardDetail = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
               <div className="flex flex-col">
                 <span className="text-gray-500 text-xs mb-1">작성자</span>
-                <span className="font-medium text-gray-800">{post.author}</span>
+                <span 
+                  className="font-medium text-gray-800 hover:text-amber-600 cursor-pointer transition-colors"
+                  onClick={() => handleShowProfile(post.authorId, post.author)}
+                  title="프로필 보기"
+                >
+                  {post.author}
+                </span>
               </div>
               <div className="flex flex-col">
                 <span className="text-gray-500 text-xs mb-1">작성일</span>
@@ -321,6 +346,14 @@ const BoardDetail = () => {
           <CommentSection postId={id} />
         </div>
       </div>
+
+      {/* 사용자 프로필 모달 */}
+      <UserProfileModal
+        isOpen={showProfileModal}
+        onClose={handleCloseProfileModal}
+        userId={selectedUser?.id}
+        userName={selectedUser?.name}
+      />
     </div>
   );
 };

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { auth } from "../util/firebase";
+import { auth, db } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getHealthPost, incrementViews, deleteHealthPost, toggleLike } from "../util/healthService";
 import { markNotificationsByPostIdAsRead } from "../util/notificationService";
 import { formatTextWithLinks } from "../util/textUtils.jsx";
 import CommentSection from "./CommentSection";
+import UserProfileModal from "./UserProfileModal";
 
 const HealthDetail = () => {
   const { id } = useParams();
@@ -15,6 +16,10 @@ const HealthDetail = () => {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [liking, setLiking] = useState(false);
+  
+  // 프로필 모달 관련 상태
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -97,6 +102,17 @@ const HealthDetail = () => {
     navigate(`/health/edit/${id}`);
   };
 
+  // 프로필 관련 함수들
+  const handleShowProfile = (userId, userName) => {
+    setSelectedUser({ id: userId, name: userName });
+    setShowProfileModal(true);
+  };
+
+  const handleCloseProfileModal = () => {
+    setShowProfileModal(false);
+    setSelectedUser(null);
+  };
+
   const handleLike = async () => {
     if (!user) {
       alert("좋아요를 누르려면 로그인이 필요합니다.");
@@ -131,30 +147,31 @@ const HealthDetail = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 pb-20">
-        <div className="max-w-4xl mx-auto p-6">
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-700 mx-auto mb-4"></div>
-            <p className="text-amber-700">게시글을 불러오는 중...</p>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-700 mx-auto mb-4"></div>
+          <p className="text-amber-700">건강정보 게시글을 불러오는 중...</p>
         </div>
       </div>
     );
   }
 
-  if (!post) {
+  if (!post && !loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 pb-20">
-        <div className="max-w-4xl mx-auto p-6">
-          <div className="text-center py-12">
-            <p className="text-gray-600 text-lg">게시글을 찾을 수 없습니다.</p>
-            <button
-              onClick={() => navigate("/health")}
-              className="mt-4 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
-            >
-              목록으로 돌아가기
-            </button>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-gray-400 text-6xl mb-4">📄</div>
+          <p className="text-gray-600 text-lg mb-2">건강정보 게시글을 찾을 수 없습니다</p>
+          <p className="text-gray-500 text-sm mb-4">삭제되었거나 잘못된 링크일 수 있습니다.</p>
+          <button
+            onClick={() => navigate("/health")}
+            className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors"
+            title="건강정보로 돌아가기"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
         </div>
       </div>
     );
@@ -163,18 +180,19 @@ const HealthDetail = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 pb-20">
       <div className="max-w-4xl mx-auto p-6">
-        {/* Header */}
+        {/* 헤더 */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
           <div className="flex items-center justify-between">
             <button
               onClick={() => navigate("/health")}
-              className="flex items-center text-amber-600 hover:text-amber-700 transition-colors"
+              className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110"
+              title="건강정보로 돌아가기"
             >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
               </svg>
-              목록으로 돌아가기
             </button>
+            <h1 className="text-2xl font-bold text-gray-800">건강정보</h1>
             <div className="flex items-center space-x-2">
               {isAuthor && (
                 <>
@@ -201,11 +219,11 @@ const HealthDetail = () => {
           </div>
         </div>
 
-        {/* Post Content */}
+        {/* 게시글 내용 */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-          {/* Post Header */}
-          <div className="border-b border-gray-200 pb-4 mb-6">
-            <div className="flex items-center justify-between mb-2">
+          {/* 게시글 헤더 */}
+          <div className="border-b border-gray-200 pb-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
               <span className="inline-block bg-amber-100 text-amber-800 text-sm px-3 py-1 rounded-full">
                 {post.category}
               </span>
@@ -213,13 +231,22 @@ const HealthDetail = () => {
                 {formatDate(post.createdAt)}
               </span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-800 mb-3">
-              {post.title}
-            </h1>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">{post.title}</h2>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
               <div className="flex flex-col">
                 <span className="text-gray-500 text-xs mb-1">작성자</span>
-                <span className="font-medium text-gray-800">{post.author}</span>
+                <span 
+                  className="font-medium text-gray-800 hover:text-amber-600 cursor-pointer transition-colors"
+                  onClick={() => handleShowProfile(post.authorId, post.author)}
+                  title="프로필 보기"
+                >
+                  {post.author}
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-gray-500 text-xs mb-1">작성일</span>
+                <span className="text-gray-600">{formatDate(post.createdAt)}</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-gray-500 text-xs mb-1">조회수</span>
@@ -249,14 +276,14 @@ const HealthDetail = () => {
             </div>
           </div>
 
-          {/* Post Content */}
+          {/* 게시글 내용 */}
           <div className="prose max-w-none">
             <div className="text-gray-700 leading-relaxed whitespace-pre-wrap">
               {formatTextWithLinks(post.content)}
             </div>
           </div>
 
-          {/* Updated Info */}
+          {/* 수정 정보 */}
           {post.updatedAt && post.updatedAt !== post.createdAt && (
             <div className="mt-6 pt-4 border-t border-gray-200">
               <p className="text-sm text-gray-500">
@@ -266,11 +293,19 @@ const HealthDetail = () => {
           )}
         </div>
 
-        {/* Comment Section */}
+        {/* 댓글 섹션 */}
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <CommentSection postId={id} boardType="health" />
         </div>
       </div>
+
+      {/* 사용자 프로필 모달 */}
+      <UserProfileModal
+        isOpen={showProfileModal}
+        onClose={handleCloseProfileModal}
+        userId={selectedUser?.id}
+        userName={selectedUser?.name}
+      />
     </div>
   );
 };

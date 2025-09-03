@@ -1,4 +1,4 @@
-import { doc, addDoc, collection, query, where, getDocs, orderBy, limit, serverTimestamp, getDoc, updateDoc } from "firebase/firestore";
+import { doc, addDoc, collection, query, where, getDocs, orderBy, limit, serverTimestamp, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
 // 사용자 인증 상태 확인 함수
@@ -13,6 +13,30 @@ const validateUserAuth = async () => {
     return currentUser;
   } catch (error) {
     throw new Error("사용자 인증이 만료되었습니다. 다시 로그인해주세요.");
+  }
+};
+
+// 관리자 권한 확인 함수
+export const checkAdminRole = async (userId) => {
+  try {
+    const userDoc = await getDoc(doc(db, "users", userId));
+    const userData = userDoc.data();
+    
+    // Firebase Auth 관리자 계정인지 확인
+    if (userData?.role === "admin" || userData?.email === "admin@tapgol.com") {
+      return true;
+    }
+    
+    // Firebase Console에서 직접 설정한 관리자 계정인지 확인
+    const adminDoc = await getDoc(doc(db, "admins", userId));
+    if (adminDoc.exists()) {
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error("관리자 권한 확인 오류:", error);
+    return false;
   }
 };
 
@@ -107,7 +131,7 @@ export const reportPost = async (postData, reason, description) => {
   }
 };
 
-// 댓글 신고
+// 댓글/대댓글 신고
 export const reportComment = async (commentData, reason, description) => {
   try {
     const currentUser = await validateUserAuth();
@@ -119,6 +143,10 @@ export const reportComment = async (commentData, reason, description) => {
     if (!reason || !REPORT_REASONS.includes(reason)) {
       throw new Error("올바른 신고 사유를 선택해주세요.");
     }
+    
+    // 댓글인지 대댓글인지 구분
+    const isReply = commentData.type === "reply";
+    const contentType = isReply ? "대댓글" : "댓글";
     
     const reportData = {
       reporterId: currentUser.uid,
@@ -133,15 +161,17 @@ export const reportComment = async (commentData, reason, description) => {
       status: "pending",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      commentType: commentData.boardType || "general"
+      commentType: commentData.boardType || "general",
+      isReply: isReply, // 대댓글 여부
+      parentCommentId: commentData.parentCommentId || null // 대댓글인 경우 부모 댓글 ID
     };
     
     const reportRef = await addDoc(collection(db, "reports"), reportData);
-    console.log("댓글 신고가 성공적으로 접수되었습니다:", reportRef.id);
+    console.log(`${contentType} 신고가 성공적으로 접수되었습니다:`, reportRef.id);
     
     return reportRef.id;
   } catch (error) {
-    console.error("댓글 신고 오류:", error);
+    console.error("댓글/대댓글 신고 오류:", error);
     throw error;
   }
 };
@@ -289,7 +319,105 @@ export const checkDuplicateReport = async (targetId, targetType, reason) => {
     
     return false; // 중복 신고 없음
   } catch (error) {
-    console.error("중복 신고 확인 오류:", error);
+    console.error("중복 신복 확인 오류:", error);
+    throw error;
+  }
+};
+
+// 관리자용 댓글/대댓글 강제 삭제
+export const adminDeleteComment = async (commentId, commentType = "comment") => {
+  try {
+    const currentUser = await validateUserAuth();
+    
+    // 관리자 권한 확인
+    const isAdmin = await checkAdminRole(currentUser.uid);
+    if (!isAdmin) {
+      throw new Error("관리자 권한이 필요합니다.");
+    }
+    
+    // 댓글/대댓글 삭제
+    if (commentType === "reply") {
+      // 대댓글 삭제
+      await deleteDoc(doc(db, "replies", commentId));
+      console.log(`관리자가 대댓글 ${commentId}를 삭제했습니다.`);
+    } else {
+      // 댓글 삭제 (대댓글도 함께 삭제)
+      await deleteDoc(doc(db, "comments", commentId));
+      
+      // 해당 댓글의 대댓글들도 삭제
+      const repliesQuery = query(
+        collection(db, "replies"),
+        where("parentCommentId", "==", commentId)
+      );
+      const repliesSnapshot = await getDocs(repliesQuery);
+      
+      const deletePromises = repliesSnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+      
+      console.log(`관리자가 댓글 ${commentId}와 관련 대댓글들을 삭제했습니다.`);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("관리자 댓글 삭제 오류:", error);
+    throw error;
+  }
+};
+
+// 관리자용 게시글 강제 삭제
+export const adminDeletePost = async (postId, postType) => {
+  try {
+    const currentUser = await validateUserAuth();
+    
+    // 관리자 권한 확인
+    const isAdmin = await checkAdminRole(currentUser.uid);
+    if (!isAdmin) {
+      throw new Error("관리자 권한이 필요합니다.");
+    }
+    
+    // 게시글 타입에 따른 컬렉션 결정
+    let collectionName;
+    switch (postType) {
+      case "board":
+        collectionName = "posts";
+        break;
+      case "health":
+        collectionName = "healthPosts";
+        break;
+      case "marketplace":
+        collectionName = "marketplacePosts";
+        break;
+      case "gallery":
+        collectionName = "galleryItems";
+        break;
+      case "karaoke":
+        collectionName = "karaokePosts";
+        break;
+      case "cooking":
+        collectionName = "cookingPosts";
+        break;
+      default:
+        collectionName = "posts";
+    }
+    
+    // 게시글 삭제
+    await deleteDoc(doc(db, collectionName, postId));
+    
+    // 관련 댓글들도 삭제
+    const commentsQuery = query(
+      collection(db, "comments"),
+      where("postId", "==", postId)
+    );
+    const commentsSnapshot = await getDocs(commentsQuery);
+    
+    const deletePromises = commentsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+    await Promise.all(deletePromises);
+    
+    console.log(`관리자가 ${postType} 게시글 ${postId}와 관련 댓글들을 삭제했습니다.`);
+    
+    return true;
+  } catch (error) {
+    console.error("관리자 게시글 삭제 오류:", error);
     throw error;
   }
 };

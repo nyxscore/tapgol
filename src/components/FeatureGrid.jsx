@@ -11,7 +11,6 @@ const FeatureGrid = () => {
       icon: '📋',
       path: '/board'
     },
-
     {
       id: 5,
       name: '추억앨범',
@@ -24,14 +23,12 @@ const FeatureGrid = () => {
       icon: '🏥',
       path: '/health'
     },
-
     {
       id: 7,
-      name: '요리노하우',
+              name: '나만의요리',
       icon: '👨‍🍳',
       path: '/cooking'
     },
-
     {
       id: 8,
       name: '노래자랑',
@@ -43,6 +40,12 @@ const FeatureGrid = () => {
       name: '중고장터',
       icon: '🛒',
       path: '/marketplace'
+    },
+    {
+      id: 10,
+      name: '개똥철학',
+      icon: '📚',
+      path: '/philosophy'
     }
   ];
 

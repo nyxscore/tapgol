@@ -164,12 +164,12 @@ const GalleryUpload = () => {
           <div className="flex items-center justify-between">
             <button
               onClick={handleCancel}
-              className="flex items-center text-amber-700 hover:text-amber-800 font-medium"
+              className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110"
+              title="추억앨범으로 돌아가기"
             >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
               </svg>
-                              추억앨범으로 돌아가기
             </button>
             <h1 className="text-2xl font-bold text-gray-800">추억앨범 업로드</h1>
             <div className="w-24"></div>
