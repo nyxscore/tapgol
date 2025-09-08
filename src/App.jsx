@@ -34,6 +34,7 @@ const HealthEdit = lazy(() => import("./components/HealthEdit"));
 const PhilosophyBoard = lazy(() => import("./components/PhilosophyBoard"));
 const PhilosophyWrite = lazy(() => import("./components/PhilosophyWrite"));
 const PhilosophyDetail = lazy(() => import("./components/PhilosophyDetail"));
+const PhilosophyEdit = lazy(() => import("./components/PhilosophyEdit"));
 
 const Alerts = lazy(() => import("./components/Alerts"));
 const NotificationBoard = lazy(() => import("./components/NotificationBoard"));
@@ -45,6 +46,7 @@ const MarketplaceDetail = lazy(() => import("./components/MarketplaceDetail"));
 const MarketplaceEdit = lazy(() => import("./components/MarketplaceEdit"));
 const ReportManagement = lazy(() => import("./components/ReportManagement"));
 const AdminPanel = lazy(() => import("./components/AdminPanel"));
+
 
 // 메인 레이아웃 컴포넌트
 function MainLayout() {
@@ -96,6 +98,7 @@ export default function App() {
                   <Route path="/philosophy" element={<PhilosophyBoard />} />
                   <Route path="/philosophy/write" element={<PhilosophyWrite />} />
                   <Route path="/philosophy/:id" element={<PhilosophyDetail />} />
+                  <Route path="/philosophy/edit/:id" element={<PhilosophyEdit />} />
                   <Route path="/alerts" element={<Alerts />} />
                   <Route path="/notification-board" element={<NotificationBoard />} />
                   <Route path="/marketplace" element={<Marketplace />} />

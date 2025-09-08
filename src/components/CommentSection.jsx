@@ -16,6 +16,7 @@ import { formatTextWithLinks } from "../util/textUtils.jsx";
 import ReportModal from './ReportModal';
 import UserProfileModal from './UserProfileModal';
 import { FaFlag } from 'react-icons/fa';
+import { isAdmin, formatAdminName, getAdminPostStyles, getEnhancedAdminStyles } from '../util/adminUtils';
 
 const CommentSection = ({ postId, postType = "board", boardType = "board" }) => {
   const [comments, setComments] = useState([]);
@@ -468,7 +469,19 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
           </div>
         ) : (
           comments.map((comment) => (
-            <div key={comment.id} className="border border-gray-200 rounded-lg p-4">
+            <div key={comment.id} className={`border rounded-lg p-4 ${
+              isAdmin(comment.authorEmail) 
+                ? getEnhancedAdminStyles().container
+                : 'border border-gray-200'
+            }`}>
+              {isAdmin(comment.authorEmail) && (
+                <>
+                  <div className={getEnhancedAdminStyles().glowEffect}></div>
+                  <svg className="absolute top-2 right-2 w-5 h-5 text-purple-500 animate-bounce" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                </>
+              )}
               {editingComment === comment.id ? (
                 // 수정 모드
                 <div className="space-y-3">
@@ -505,11 +518,29 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-2">
                       <span 
-                        className="font-semibold text-gray-800 hover:text-amber-600 cursor-pointer transition-colors"
+                        className="cursor-pointer transition-colors"
                         onClick={() => handleShowProfile(comment.authorId, comment.author)}
                         title="프로필 보기"
                       >
-                        {comment.author}
+                        {(() => {
+                          const adminInfo = formatAdminName(comment.author, comment.authorEmail);
+                          if (adminInfo.isAdmin) {
+                            return (
+                              <span className="inline-flex items-center space-x-1">
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg">
+                                  <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                  </svg>
+                                  {adminInfo.badgeText}
+                                </span>
+                                <span className="font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                                  {adminInfo.name}
+                                </span>
+                              </span>
+                            );
+                          }
+                          return adminInfo.name;
+                        })()}
                       </span>
                       <span className="text-sm text-gray-500">
                         {formatDate(comment.createdAt)}
@@ -524,7 +555,7 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
                        {user && (
                          <button
                            onClick={() => toggleReplyForm(comment.id)}
-                           className="text-amber-600 hover:text-amber-700 text-sm"
+                           className="px-3 py-1 rounded-lg transition-colors text-sm bg-amber-100 text-amber-700 hover:bg-amber-200"
                          >
                            {showReplyForm[comment.id] ? "답글 취소" : "답글"}
                          </button>
@@ -532,7 +563,7 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
                        {user && !isCommentAuthor(comment) && (
                          <button
                            onClick={() => handleReportComment(comment)}
-                           className="text-red-600 hover:text-red-700 text-sm flex items-center space-x-1"
+                           className="px-3 py-1 rounded-lg transition-colors text-sm bg-red-100 text-red-700 hover:bg-red-200 flex items-center space-x-1"
                            title="신고하기"
                          >
                            <FaFlag className="text-xs" />
@@ -543,13 +574,13 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
                          <>
                            <button
                              onClick={() => startEdit(comment)}
-                             className="text-blue-600 hover:text-blue-700 text-sm"
+                             className="px-3 py-1 rounded-lg transition-colors text-sm bg-blue-100 text-blue-700 hover:bg-blue-200"
                            >
                              수정
                            </button>
                            <button
                              onClick={() => handleDeleteComment(comment.id)}
-                             className="text-red-600 hover:text-red-700 text-sm"
+                             className="px-3 py-1 rounded-lg transition-colors text-sm bg-red-100 text-red-700 hover:bg-red-200"
                            >
                              삭제
                            </button>
@@ -584,7 +615,7 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
                             <div className="flex space-x-2">
                               <button
                                 onClick={() => setShowReplyForm(prev => ({ ...prev, [comment.id]: false }))}
-                                className="px-2 py-1 border border-gray-300 text-gray-700 rounded text-xs hover:bg-gray-50"
+                                className="px-2 py-1 rounded transition-colors text-xs bg-gray-100 text-gray-700 hover:bg-gray-200"
                               >
                                 취소
                               </button>
@@ -594,7 +625,7 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
                                 className={`px-3 py-1 rounded text-xs transition-colors ${
                                   submittingReply[comment.id]
                                     ? "bg-gray-400 text-white cursor-not-allowed"
-                                    : "bg-amber-600 text-white hover:bg-amber-700"
+                                    : "bg-amber-100 text-amber-700 hover:bg-amber-200"
                                 }`}
                               >
                                 {submittingReply[comment.id] ? "작성 중..." : "답글 작성"}
@@ -610,7 +641,19 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
                   {replies[comment.id] && replies[comment.id].length > 0 && (
                     <div className="ml-6 border-l-2 border-gray-200 pl-4 space-y-3">
                       {replies[comment.id].map((reply) => (
-                        <div key={reply.id} className="bg-gray-50 rounded-lg p-3">
+                        <div key={reply.id} className={`rounded-lg p-3 relative ${
+                          isAdmin(reply.authorEmail) 
+                            ? getEnhancedAdminStyles().container
+                            : 'bg-gray-50'
+                        }`}>
+                          {isAdmin(reply.authorEmail) && (
+                            <>
+                              <div className={getEnhancedAdminStyles().glowEffect}></div>
+                              <svg className="absolute top-1 right-1 w-4 h-4 text-purple-500 animate-bounce" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                            </>
+                          )}
                           {editingReply[reply.id] ? (
                             // 대댓글 수정 모드
                             <div className="space-y-2">
@@ -628,13 +671,13 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
                                 <div className="flex space-x-1">
                                   <button
                                     onClick={() => handleEditReply(comment.id, reply.id)}
-                                    className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+                                    className="px-2 py-1 rounded transition-colors text-xs bg-blue-100 text-blue-700 hover:bg-blue-200"
                                   >
                                     수정
                                   </button>
                                   <button
                                     onClick={() => cancelEditReply(reply.id)}
-                                    className="px-2 py-1 border border-gray-300 text-gray-700 rounded text-xs hover:bg-gray-50"
+                                    className="px-2 py-1 rounded transition-colors text-xs bg-gray-100 text-gray-700 hover:bg-gray-200"
                                   >
                                     취소
                                   </button>
@@ -647,11 +690,29 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
                               <div className="flex items-center justify-between mb-1">
                                 <div className="flex items-center space-x-2">
                                   <span 
-                                    className="font-medium text-gray-800 text-sm hover:text-amber-600 cursor-pointer transition-colors"
+                                    className="text-sm cursor-pointer transition-colors"
                                     onClick={() => handleShowProfile(reply.authorId, reply.author)}
                                     title="프로필 보기"
                                   >
-                                    {reply.author}
+                                    {(() => {
+                                      const adminInfo = formatAdminName(reply.author, reply.authorEmail);
+                                      if (adminInfo.isAdmin) {
+                                        return (
+                                          <span className="inline-flex items-center space-x-1">
+                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg">
+                                              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                              </svg>
+                                              {adminInfo.badgeText}
+                                            </span>
+                                            <span className="font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                                              {adminInfo.name}
+                                            </span>
+                                          </span>
+                                        );
+                                      }
+                                      return adminInfo.name;
+                                    })()}
                                   </span>
                                   <span className="text-xs text-gray-500">
                                     {formatDate(reply.createdAt)}
@@ -666,7 +727,7 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
                                    {user && !isReplyAuthor(reply) && (
                                      <button
                                        onClick={() => handleReportReply(reply)}
-                                       className="text-red-600 hover:text-red-700 text-xs flex items-center space-x-1"
+                                       className="px-2 py-1 rounded transition-colors text-xs bg-red-100 text-red-700 hover:bg-red-200 flex items-center space-x-1"
                                        title="신고하기"
                                      >
                                        <FaFlag className="text-xs" />
@@ -677,13 +738,13 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
                                      <>
                                        <button
                                          onClick={() => startEditReply(reply.id, reply.content)}
-                                         className="text-blue-600 hover:text-blue-700 text-xs"
+                                         className="px-2 py-1 rounded transition-colors text-xs bg-blue-100 text-blue-700 hover:bg-blue-200"
                                        >
                                          수정
                                        </button>
                                        <button
                                          onClick={() => handleDeleteReply(comment.id, reply.id)}
-                                         className="text-red-600 hover:text-red-700 text-xs"
+                                         className="px-2 py-1 rounded transition-colors text-xs bg-red-100 text-red-700 hover:bg-red-200"
                                        >
                                          삭제
                                        </button>

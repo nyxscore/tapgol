@@ -31,6 +31,7 @@ import { formatTextWithLinks } from "../util/textUtils.jsx";
 import ReportModal from "./ReportModal";
 import UserProfileModal from "./UserProfileModal";
 import { FaFlag } from "react-icons/fa";
+import { isAdmin, formatAdminName, getEnhancedAdminStyles } from '../util/adminUtils';
 
 const Chat = () => {
   const navigate = useNavigate();
@@ -659,7 +660,16 @@ const Chat = () => {
                 messages.map((message) => {
                   const isMyMessage = isMessageAuthor(message);
                   return (
-                    <div key={message.id} className={`flex ${isMyMessage ? 'justify-start' : 'justify-end'} mb-3`}>
+                    <div key={message.id} className={`flex ${isMyMessage ? 'justify-start' : 'justify-end'} mb-3 ${
+                      isAdmin(message.authorEmail) ? 'relative' : ''
+                    }`}>
+                      {isAdmin(message.authorEmail) && (
+                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center z-10 animate-bounce">
+                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      )}
                       {isMyMessage && (
                         <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 mr-2">
                           {userData?.nickname?.[0] || userData?.name?.[0] || user.displayName?.[0] || "나"}
@@ -670,17 +680,43 @@ const Chat = () => {
                       >
                         {isMyMessage && (
                           <div className="flex items-center space-x-2 mb-1">
-                            <span className="font-medium text-gray-800 text-sm">
-                              {message.author || message.authorName || userData?.nickname || userData?.name || user?.displayName || "나"}
+                            <span className="text-sm">
+                              {(() => {
+                                const authorName = message.author || message.authorName || userData?.nickname || userData?.name || user?.displayName || "나";
+                                const adminInfo = formatAdminName(authorName, message.authorEmail);
+                                if (adminInfo.isAdmin) {
+                                  return (
+                                    <span className="inline-flex items-center space-x-1">
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg animate-pulse">
+                                        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                        </svg>
+                                        {adminInfo.badgeText}
+                                      </span>
+                                      <span className="font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                                        {adminInfo.name}
+                                      </span>
+                                    </span>
+                                  );
+                                }
+                                return <span className="font-medium text-gray-800">{adminInfo.name}</span>;
+                              })()}
                             </span>
                             <span className="text-xs text-gray-500">{formatDate(message.createdAt)}</span>
                           </div>
                         )}
-                        <div className={`rounded-2xl px-4 py-2 ${
-                          isMyMessage 
-                            ? 'bg-amber-500 text-white rounded-bl-md' 
-                            : 'bg-gray-200 text-gray-800 rounded-br-md'
+                        <div className={`rounded-2xl px-4 py-2 relative ${
+                          isAdmin(message.authorEmail)
+                            ? isMyMessage
+                              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-bl-md shadow-lg shadow-purple-300/50 ring-2 ring-purple-200/50'
+                              : 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 rounded-br-md shadow-lg shadow-purple-200/50 ring-2 ring-purple-200/30 border-l-4 border-purple-400'
+                            : isMyMessage 
+                              ? 'bg-amber-500 text-white rounded-bl-md' 
+                              : 'bg-gray-200 text-gray-800 rounded-br-md'
                         }`}>
+                          {isAdmin(message.authorEmail) && (
+                            <div className="absolute inset-0 bg-gradient-to-r from-purple-400/20 via-pink-400/20 to-purple-400/20 animate-pulse rounded-2xl"></div>
+                          )}
                           {/* 답글 정보 표시 */}
                           {message.replyTo && (
                             <div className={`mb-2 p-2 rounded-lg border-l-4 ${
@@ -699,7 +735,11 @@ const Chat = () => {
                               </div>
                             </div>
                           )}
-                          <div className="whitespace-pre-wrap break-words text-sm">
+                          <div className={`whitespace-pre-wrap break-words text-sm ${
+                            isAdmin(message.authorEmail) 
+                              ? 'font-medium drop-shadow-sm shadow-purple-400/30'
+                              : ''
+                          }`}>
                             {formatTextWithLinks(message.content)}
                           </div>
                         </div>
@@ -709,11 +749,30 @@ const Chat = () => {
                               <div className="flex items-center space-x-1">
                                 <span className="text-xs text-gray-500">{formatDate(message.createdAt)}</span>
                                 <span 
-                                  className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer transition-colors"
+                                  className="text-xs cursor-pointer transition-colors"
                                   onClick={() => handleShowProfile(message.authorId || message.userId, message.author || message.authorName)}
                                   title="프로필 보기"
                                 >
-                                  • {message.author || message.authorName || "익명"}
+                                  • {(() => {
+                                    const authorName = message.author || message.authorName || "익명";
+                                    const adminInfo = formatAdminName(authorName, message.authorEmail);
+                                    if (adminInfo.isAdmin) {
+                                      return (
+                                        <span className="inline-flex items-center space-x-1">
+                                          <span className="inline-flex items-center px-1 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg animate-pulse">
+                                            <svg className="w-2 h-2 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                              <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                            </svg>
+                                            {adminInfo.badgeText}
+                                          </span>
+                                          <span className="font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                                            {adminInfo.name}
+                                          </span>
+                                        </span>
+                                      );
+                                    }
+                                    return <span className="text-gray-400 hover:text-gray-600">{adminInfo.name}</span>;
+                                  })()}
                                 </span>
                               </div>
                               <button

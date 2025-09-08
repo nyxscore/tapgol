@@ -1,4 +1,4 @@
-import { doc, addDoc, collection, query, where, getDocs, orderBy, limit, serverTimestamp, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { doc, addDoc, collection, query, where, getDocs, orderBy, limit, serverTimestamp, getDoc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
 // 사용자 인증 상태 확인 함수
@@ -19,20 +19,63 @@ const validateUserAuth = async () => {
 // 관리자 권한 확인 함수
 export const checkAdminRole = async (userId) => {
   try {
+    // 현재 로그인한 사용자의 이메일 확인
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      return false;
+    }
+    
+    const userEmail = currentUser.email;
+    console.log("관리자 권한 확인 중:", { userId, userEmail });
+    
+    // 지정된 관리자 이메일 확인
+    if (userEmail === "juhyundon82@gmail.com") {
+      console.log("관리자 이메일로 권한 부여:", userEmail);
+      
+      // 관리자 정보를 Firestore에 자동 저장
+      try {
+        await setDoc(doc(db, "users", userId), {
+          uid: userId,
+          email: userEmail,
+          role: "admin",
+          isAdmin: true,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+        
+        // admins 컬렉션에도 추가
+        await setDoc(doc(db, "admins", userId), {
+          uid: userId,
+          email: userEmail,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+        
+        console.log("관리자 정보가 Firestore에 저장되었습니다.");
+      } catch (error) {
+        console.error("관리자 정보 저장 오류:", error);
+      }
+      
+      return true;
+    }
+    
+    // Firestore users 컬렉션에서 관리자 권한 확인
     const userDoc = await getDoc(doc(db, "users", userId));
     const userData = userDoc.data();
     
-    // Firebase Auth 관리자 계정인지 확인
-    if (userData?.role === "admin" || userData?.email === "admin@tapgol.com") {
+    if (userData?.role === "admin") {
+      console.log("관리자 권한 확인됨:", userData);
       return true;
     }
     
     // Firebase Console에서 직접 설정한 관리자 계정인지 확인
     const adminDoc = await getDoc(doc(db, "admins", userId));
     if (adminDoc.exists()) {
+      console.log("관리자 권한 확인됨 (admins 컬렉션)");
       return true;
     }
     
+    console.log("관리자 권한 없음");
     return false;
   } catch (error) {
     console.error("관리자 권한 확인 오류:", error);
@@ -286,8 +329,7 @@ export const checkDuplicateReport = async (targetId, targetType, reason) => {
     const q = query(
       collection(db, "reports"),
       where("reporterId", "==", currentUser.uid),
-      where("reason", "==", reason),
-      where("status", "in", ["pending", "reviewed"])
+      where("reason", "==", reason)
     );
     
     const querySnapshot = await getDocs(q);
@@ -295,6 +337,11 @@ export const checkDuplicateReport = async (targetId, targetType, reason) => {
     // targetType에 따라 다른 필드 확인
     for (const doc of querySnapshot.docs) {
       const data = doc.data();
+      // 클라이언트에서 상태 필터링
+      if (data.status !== "pending" && data.status !== "reviewed") {
+        continue;
+      }
+      
       let isDuplicate = false;
       
       switch (targetType) {

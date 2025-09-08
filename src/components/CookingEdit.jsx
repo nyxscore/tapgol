@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../util/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../util/firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { FaArrowLeft, FaSave } from 'react-icons/fa';
+import { FaArrowLeft, FaSave, FaImage, FaTimes } from 'react-icons/fa';
 
 const CookingEdit = () => {
   const navigate = useNavigate();
@@ -17,10 +18,71 @@ const CookingEdit = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [images, setImages] = useState([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
 
   const categories = [
     '한식', '중식', '일식', '양식', '베이킹', '음료', '간식', '기타'
   ];
+
+  // 이미지 업로드 함수
+  const handleImageUpload = async (files) => {
+    if (!files || files.length === 0) return;
+
+    setUploadingImages(true);
+    const uploadPromises = Array.from(files).map(async (file) => {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('파일 크기는 5MB 이하여야 합니다.');
+        return null;
+      }
+
+      if (!file.type.startsWith('image/')) {
+        alert('이미지 파일만 업로드 가능합니다.');
+        return null;
+      }
+
+      try {
+        const imageRef = ref(storage, `cooking/${Date.now()}_${file.name}`);
+        const snapshot = await uploadBytes(imageRef, file);
+        const downloadURL = await getDownloadURL(snapshot.ref);
+        
+        return {
+          id: Date.now() + Math.random(),
+          url: downloadURL,
+          name: file.name,
+          size: file.size
+        };
+      } catch (error) {
+        console.error('이미지 업로드 오류:', error);
+        alert('이미지 업로드에 실패했습니다.');
+        return null;
+      }
+    });
+
+    try {
+      const uploadedImages = await Promise.all(uploadPromises);
+      const validImages = uploadedImages.filter(img => img !== null);
+      setImages(prev => [...prev, ...validImages]);
+    } catch (error) {
+      console.error('이미지 업로드 오류:', error);
+      alert('이미지 업로드에 실패했습니다.');
+    } finally {
+      setUploadingImages(false);
+    }
+  };
+
+  // 이미지 삭제 함수
+  const handleImageRemove = (imageId) => {
+    setImages(prev => prev.filter(img => img.id !== imageId));
+  };
+
+  // 파일 선택 핸들러
+  const handleFileSelect = (e) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      handleImageUpload(files);
+    }
+  };
 
   useEffect(() => {
     loadPost();
@@ -45,6 +107,17 @@ const CookingEdit = () => {
           content: postData.content || '',
           category: postData.category || '한식'
         });
+
+        // 기존 이미지들 로드
+        if (postData.images && postData.images.length > 0) {
+          const existingImages = postData.images.map((url, index) => ({
+            id: `existing_${index}`,
+            url: url,
+            name: `기존 이미지 ${index + 1}`,
+            size: 0
+          }));
+          setImages(existingImages);
+        }
       } else {
         setError("요리 게시글을 찾을 수 없습니다.");
       }
@@ -76,6 +149,7 @@ const CookingEdit = () => {
         title: form.title.trim(),
         content: form.content.trim(),
         category: form.category,
+        images: images.map(img => img.url), // 이미지 URL 배열 업데이트
         updatedAt: serverTimestamp()
       });
       
@@ -177,6 +251,69 @@ const CookingEdit = () => {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Image Upload Section */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  요리 사진 첨부 (선택사항)
+                </label>
+                <div className="space-y-4">
+                  {/* Upload Button */}
+                  <div className="flex items-center space-x-4">
+                    <label className="flex items-center space-x-2 px-4 py-2 bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 transition-colors cursor-pointer">
+                      <FaImage className="w-4 h-4" />
+                      <span>사진 추가</span>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        disabled={uploadingImages}
+                      />
+                    </label>
+                    {uploadingImages && (
+                      <div className="flex items-center space-x-2 text-amber-600">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-600"></div>
+                        <span className="text-sm">업로드 중...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Image Preview */}
+                  {images.length > 0 && (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {images.map((image) => (
+                        <div key={image.id} className="relative group">
+                          <img
+                            src={image.url}
+                            alt={image.name}
+                            className="w-full h-32 object-cover rounded-lg shadow-md"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleImageRemove(image.id)}
+                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                          >
+                            <FaTimes className="w-3 h-3" />
+                          </button>
+                          <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-2 rounded-b-lg">
+                            <div className="truncate">{image.name}</div>
+                            {image.size > 0 && <div>{(image.size / 1024 / 1024).toFixed(1)}MB</div>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Upload Info */}
+                  <div className="text-xs text-gray-500">
+                    <p>• 최대 5MB까지 업로드 가능합니다</p>
+                    <p>• JPG, PNG, GIF 형식을 지원합니다</p>
+                    <p>• 여러 장의 사진을 한 번에 선택할 수 있습니다</p>
+                  </div>
+                </div>
               </div>
 
               {/* Title */}

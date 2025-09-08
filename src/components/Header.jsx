@@ -1,58 +1,55 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { auth } from "../util/firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { useAuth } from "../contexts/AuthContext";
 import { getUserProfile } from "../util/userService";
 import { checkAdminRole } from "../util/reportService";
 
 const Header = () => {
-  const [user, setUser] = useState(null);
+  const { user, logout } = useAuth();
   const [userData, setUserData] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        
-        // Firestore에서 사용자 정보 가져오기
+    const loadUserData = async () => {
+      if (user) {
         try {
-          const profile = await getUserProfile(currentUser.uid);
+          const profile = await getUserProfile(user.uid);
           setUserData(profile);
           
           // 관리자 권한 확인
-          const adminStatus = await checkAdminRole(currentUser.uid);
+          const adminStatus = await checkAdminRole(user.uid);
           setIsAdmin(adminStatus);
         } catch (error) {
           console.error("사용자 정보 로드 오류:", error);
           // 기본 정보만 사용
           setUserData({
-            name: currentUser.displayName || "사용자",
-            nickname: currentUser.displayName || "사용자"
+            name: user.displayName || "사용자",
+            nickname: user.displayName || "사용자"
           });
           setIsAdmin(false);
         }
-              } else {
-          setUser(null);
-          setUserData(null);
-          setIsAdmin(false);
-        }
+      } else {
+        setUserData(null);
+        setIsAdmin(false);
+      }
       setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
-  }, []);
+    loadUserData();
+  }, [user]);
+
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await logout();
       navigate("/");
     } catch (error) {
       console.error("로그아웃 오류:", error);
     }
   };
+
 
   const getUserDisplayName = () => {
     if (userData?.nickname) {

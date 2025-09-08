@@ -3,15 +3,17 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { subscribeToUnreadChatCount } from "../util/notificationService";
+import { subscribeToUnreadChatCount, subscribeToUnreadCount } from "../util/notificationService";
 
 const BottomNavigation = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState(null);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const unsubscribeRef = useRef(null);
   const chatNotificationUnsubscribeRef = useRef(null);
+  const notificationUnsubscribeRef = useRef(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -22,23 +24,33 @@ const BottomNavigation = () => {
   }, []);
 
   useEffect(() => {
-    // 로그인된 사용자만 읽지 않은 채팅 알림 개수 구독
+    // 로그인된 사용자만 읽지 않은 알림 개수 구독
     if (user) {
       try {
+        // 채팅 알림 구독
         chatNotificationUnsubscribeRef.current = subscribeToUnreadChatCount((count) => {
           setUnreadChatCount(count);
         });
+        
+        // 일반 알림 구독
+        notificationUnsubscribeRef.current = subscribeToUnreadCount((count) => {
+          setUnreadNotificationCount(count);
+        });
       } catch (error) {
-        console.error("채팅 알림 개수 구독 오류:", error);
+        console.error("알림 개수 구독 오류:", error);
       }
     } else {
       // 로그아웃 시 알림 개수 초기화
       setUnreadChatCount(0);
+      setUnreadNotificationCount(0);
     }
 
     return () => {
       if (chatNotificationUnsubscribeRef.current) {
         chatNotificationUnsubscribeRef.current();
+      }
+      if (notificationUnsubscribeRef.current) {
+        notificationUnsubscribeRef.current();
       }
     };
   }, [user]);
@@ -68,13 +80,14 @@ const BottomNavigation = () => {
     {
       id: 2,
       name: "알림",
-      path: "/notification-board",
+      path: "/alerts",
       icon: (
         <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
           <path d="M10 2a6 6 0 00-6 6v2.586l-.707.707A1 1 0 004 13h12a1 1 0 00.707-1.707L16 10.586V8a6 6 0 00-6-6z" />
           <path d="M14 14a4 4 0 11-8 0h8z" />
         </svg>
       ),
+      badge: user && unreadNotificationCount > 0 ? unreadNotificationCount : null
     },
     {
       id: 3,
