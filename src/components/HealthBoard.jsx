@@ -1,10 +1,12 @@
 // src/components/HealthBoard.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { auth } from "../util/firebase";
+import { auth, db } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { getHealthPosts, toggleLike, incrementViews } from "../util/healthService";
 import UserProfileModal from './UserProfileModal';
+import { navigateToDM } from '../util/dmUtils';
 
 const HealthBoard = () => {
   const navigate = useNavigate();
@@ -23,13 +25,44 @@ const HealthBoard = () => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       console.log("인증 상태 변경:", currentUser ? "로그인됨" : "로그아웃됨");
       setUser(currentUser);
-      // 사용자 상태가 설정된 후 게시글 로드
-      loadHealthPosts();
     });
+
+    // 실시간 건강정보 게시글 구독 (최적화된 쿼리)
+    const q = query(
+      collection(db, "healthPosts"),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribePosts = onSnapshot(q, 
+      { includeMetadataChanges: true }, // 메타데이터 변경도 감지하여 삭제 즉시 반영
+      (querySnapshot) => {
+        const postsData = [];
+        querySnapshot.forEach((doc) => {
+          // 삭제된 문서는 제외
+          if (doc.exists()) {
+            postsData.push({
+              id: doc.id,
+              ...doc.data()
+            });
+          }
+        });
+        console.log("로드된 건강정보 게시글:", postsData);
+        setPosts(postsData);
+        setLoading(false);
+      }, 
+      (error) => {
+        console.error("건강정보 게시글 실시간 구독 오류:", error);
+        // BloomFilter 오류는 무시 (기능에 영향 없음)
+        if (error.name !== 'BloomFilterError') {
+          setLoading(false);
+        }
+      }
+    );
 
     return () => {
       console.log("HealthBoard 컴포넌트 언마운트");
       unsubscribe();
+      unsubscribePosts();
     };
   }, []);
 
@@ -231,7 +264,7 @@ const HealthBoard = () => {
                           className="font-medium text-gray-800 hover:text-amber-600 cursor-pointer transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleShowProfile(post.authorId, post.author);
+                            navigateToDM(post.authorId, user, navigate);
                           }}
                           title="프로필 보기"
                         >

@@ -171,10 +171,10 @@ const Login = () => {
       
       switch (error.code) {
         case "auth/user-not-found":
-          errorMessage = "존재하지 않는 아이디입니다.";
+          errorMessage = "존재하지 않는 이메일입니다.";
           break;
         case "auth/invalid-email":
-          errorMessage = "유효하지 않은 아이디 형식입니다.";
+          errorMessage = "유효하지 않은 이메일 형식입니다.";
           break;
         case "auth/too-many-requests":
           errorMessage = "너무 많은 요청이 있었습니다. 잠시 후 다시 시도해주세요.";
@@ -188,9 +188,9 @@ const Login = () => {
     }
   };
 
-  // 아이디 찾기 (간단한 안내 메시지)
-  const handleIdFind = () => {
-    setResetMessage("아이디를 찾으려면 관리자에게 문의해주세요. 연락처: 010-4222-2466");
+  // 이메일 찾기 (간단한 안내 메시지)
+  const handleEmailFind = () => {
+    setResetMessage("이메일을 찾으려면 관리자에게 문의해주세요. 연락처: 010-4222-2466");
   };
 
   return (
@@ -321,7 +321,7 @@ const Login = () => {
               onClick={() => setShowIdFind(true)}
               className="flex-1 text-sm text-blue-600 hover:text-blue-800 underline"
             >
-              아이디 찾기
+              이메일 찾기
             </button>
           </div>
           <p className="text-xs text-gray-500 mt-2">
@@ -413,8 +413,8 @@ const Login = () => {
       {showIdFind && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md mx-4">
-            <h3 className="text-lg font-bold text-amber-700 mb-4">아이디 찾기</h3>
-            <p className="text-gray-600 mb-4">아이디를 찾으려면 관리자에게 문의해주세요.</p>
+            <h3 className="text-lg font-bold text-amber-700 mb-4">이메일 찾기</h3>
+            <p className="text-gray-600 mb-4">이메일을 찾으려면 관리자에게 문의해주세요.</p>
             
                                   <div className="bg-blue-50 p-4 rounded-lg mb-4">
                         <p className="text-blue-800 font-medium">관리자 연락처</p>

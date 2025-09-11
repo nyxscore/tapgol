@@ -6,7 +6,9 @@ import { getUserProfile } from "../util/userService";
 import { 
   subscribeToChatMessages, 
   createChatMessage, 
-  deleteChatMessage 
+  deleteChatMessage,
+  subscribeToDirectMessages,
+  createDirectMessage
 } from "../util/chatService";
 import { 
   collection, 
@@ -16,7 +18,8 @@ import {
   onSnapshot, 
   serverTimestamp,
   deleteDoc,
-  doc
+  doc,
+  getDoc
 } from "firebase/firestore";
 import { db } from "../util/firebase";
 import {
@@ -26,16 +29,17 @@ import {
   updateUserActivity,
   startPeriodicCleanup
 } from "../util/onlineUsersService";
-import { createChatNotification, markChatNotificationsAsRead } from "../util/notificationService";
 import { formatTextWithLinks } from "../util/textUtils.jsx";
 import ReportModal from "./ReportModal";
 import UserProfileModal from "./UserProfileModal";
 import { FaFlag } from "react-icons/fa";
 import { isAdmin, formatAdminName, getEnhancedAdminStyles } from '../util/adminUtils';
+import { navigateToDM } from '../util/dmUtils';
+import { markAsRead, handleMessageSent } from '../util/unreadMessagesService';
 
 const Chat = () => {
   const navigate = useNavigate();
-  const { parkId: parkIdParam } = useParams();
+  const { parkId: parkIdParam, userId: dmUserIdParam } = useParams();
   const location = useLocation();
   const [messages, setMessages] = useState([]);
   const [user, setUser] = useState(null);
@@ -51,6 +55,7 @@ const Chat = () => {
   const [replyingTo, setReplyingTo] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [targetUserInfo, setTargetUserInfo] = useState(null);
   const messagesEndRef = useRef(null);
   const unsubscribeRef = useRef(null);
   const onlineUsersUnsubscribeRef = useRef(null);
@@ -108,13 +113,59 @@ const Chat = () => {
     }
   }, [location.pathname, navigate]);
 
-  // 실시간 메시지 구독
+  // DM 채팅방에서 상대방 정보 가져오기
   useEffect(() => {
-    if (!user) return;
+    const loadTargetUserInfo = async () => {
+      if (dmUserIdParam && user) {
+        try {
+          const userDoc = await getDoc(doc(db, "users", dmUserIdParam));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setTargetUserInfo({
+              id: dmUserIdParam,
+              name: userData.nickname || userData.name || "익명",
+              email: userData.email
+            });
+          } else {
+            setTargetUserInfo({
+              id: dmUserIdParam,
+              name: "익명",
+              email: null
+            });
+          }
+        } catch (error) {
+          // BloomFilter 오류는 무시하고 다른 오류만 로깅
+          if (error.name !== 'BloomFilterError') {
+            console.error("상대방 정보 로드 오류:", error);
+          }
+          setTargetUserInfo({
+            id: dmUserIdParam,
+            name: "익명",
+            email: null
+          });
+        }
+      } else {
+        setTargetUserInfo(null);
+      }
+    };
+
+    loadTargetUserInfo();
+  }, [dmUserIdParam, user]);
+
+  // 실시간 메시지 구독 (메인/공원별/DM)
+  useEffect(() => {
+    // 기존 구독 해제
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
+    }
 
     // 현재 경로 확인
     const currentIsMainChat = location.pathname === "/chat/main";
     const currentIsParkChat = parkIdParam && location.pathname.includes("/chat/park/");
+    const currentIsDmChat = dmUserIdParam && location.pathname.includes("/chat/dm/");
+
+    console.log("채팅 구독 변경:", { currentIsMainChat, currentIsParkChat, currentIsDmChat, dmUserIdParam });
 
     try {
       if (currentIsParkChat && parkIdParam) {
@@ -124,7 +175,9 @@ const Chat = () => {
           where("parkId", "==", parkId)
         );
 
-        unsubscribeRef.current = onSnapshot(q, (querySnapshot) => {
+        unsubscribeRef.current = onSnapshot(q, 
+          { includeMetadataChanges: false }, // 메타데이터 변경 무시로 성능 최적화
+          (querySnapshot) => {
           const messages = [];
           querySnapshot.forEach((doc) => {
             messages.push({
@@ -153,6 +206,12 @@ const Chat = () => {
         });
       } else if (currentIsMainChat) {
         // 메인 채팅 구독
+        
+        // 메인 채팅방 진입 시 읽음 처리
+        if (user) {
+          markAsRead(user.uid, 'main');
+        }
+        
         unsubscribeRef.current = subscribeToChatMessages((newMessages) => {
           // 메시지 필터링 (내용이 있는 메시지만)
           const filteredMessages = newMessages.filter(message => {
@@ -172,9 +231,31 @@ const Chat = () => {
             forceScrollToBottom();
           }, 50);
         });
+      } else if (currentIsDmChat && dmUserIdParam && user) {
+        // 1:1 DM 구독
+        console.log("DM 구독 시작:", user.uid, "->", dmUserIdParam);
+        
+        // DM 채팅방 진입 시 읽음 처리
+        const threadKey = [user.uid, dmUserIdParam].sort().join('_');
+        markAsRead(user.uid, 'dm', threadKey);
+        
+        unsubscribeRef.current = subscribeToDirectMessages(user.uid, String(dmUserIdParam), (dmMessages) => {
+          console.log("DM 메시지 수신:", dmMessages.length, "개");
+          setMessages(dmMessages);
+          setTimeout(() => {
+            forceScrollToBottom();
+          }, 50);
+        });
+      } else {
+        // 구독할 채팅이 없는 경우 메시지 초기화
+        setMessages([]);
       }
     } catch (error) {
       console.error("채팅 구독 오류:", error);
+      // BloomFilter 오류는 무시 (기능에 영향 없음)
+      if (error.name !== 'BloomFilterError') {
+        setLoading(false);
+      }
     }
 
     // 실시간 접속자 목록 구독
@@ -189,21 +270,11 @@ const Chat = () => {
     // 주기적 오프라인 사용자 정리 시작
     cleanupIntervalRef.current = startPeriodicCleanup();
 
-    // 메인 채팅 페이지에 접속하면 채팅 관련 알림을 읽음 처리
-    if (user && currentIsMainChat) {
-      try {
-        const processedCount = markChatNotificationsAsRead();
-        if (processedCount > 0) {
-          console.log(`${processedCount}개의 채팅 관련 알림이 읽음 처리되었습니다.`);
-        }
-      } catch (notificationError) {
-        console.error("채팅 알림 읽음 처리 오류:", notificationError);
-      }
-    }
 
     return () => {
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
+        unsubscribeRef.current = null;
       }
       if (onlineUsersUnsubscribeRef.current) {
         onlineUsersUnsubscribeRef.current();
@@ -212,7 +283,7 @@ const Chat = () => {
         cleanupIntervalRef.current();
       }
     };
-  }, [user, location.pathname, parkId, parkIdParam]);
+  }, [user, location.pathname, parkId, parkIdParam, dmUserIdParam]);
 
   // 페이지를 벗어날 때 접속자 목록에서 제거
   useEffect(() => {
@@ -276,7 +347,7 @@ const Chat = () => {
 
   // 컴포넌트 마운트 시 최신 메시지로 스크롤 및 경로 변경 시 보정
   useEffect(() => {
-    if (!loading && (location.pathname === "/chat/main" || location.pathname.includes("/chat/park/"))) {
+    if (!loading && (location.pathname === "/chat/main" || location.pathname.includes("/chat/park/") || location.pathname.includes("/chat/dm/"))) {
       setTimeout(() => {
         forceScrollToBottom();
       }, 50);
@@ -339,8 +410,8 @@ const Chat = () => {
     try {
       const messageData = {
         content: newMessage.trim(),
-        author: userData?.nickname || userData?.name || user.displayName || "익명",
-        authorName: userData?.nickname || userData?.name || user.displayName || "익명", // authorName 추가
+        author: userData?.nickname || userData?.name || user?.displayName || "익명",
+        authorName: userData?.nickname || userData?.name || user?.displayName || "익명", // authorName 추가
         authorId: user.uid,
         authorEmail: user.email,
         replyTo: replyingTo ? {
@@ -354,6 +425,7 @@ const Chat = () => {
       // 현재 경로 확인
       const currentIsParkChat = parkIdParam && location.pathname.includes("/chat/park/");
       const currentIsMainChat = location.pathname === "/chat/main";
+      const currentIsDmChat = dmUserIdParam && location.pathname.includes("/chat/dm/");
 
       if (currentIsParkChat && parkIdParam) {
         // 공원별 채팅 메시지 전송
@@ -367,15 +439,15 @@ const Chat = () => {
         // 메인 채팅 메시지 전송
         const createdMessage = await createChatMessage(messageData);
         
-        // 채팅 알림 생성
-        try {
-          await createChatNotification({
-            ...messageData,
-            id: createdMessage.id
-          });
-        } catch (notificationError) {
-          console.error("채팅 알림 생성 오류:", notificationError);
-        }
+        // 미확인 카운트 처리
+        await handleMessageSent(createdMessage, user);
+        
+      } else if (currentIsDmChat) {
+        // DM 메시지 전송
+        const createdMessage = await createDirectMessage(user, String(dmUserIdParam), newMessage.trim(), { authorName: messageData.authorName });
+        
+        // 미확인 카운트 처리
+        await handleMessageSent(createdMessage, user);
       }
       
       // 사용자 활동 업데이트
@@ -506,8 +578,12 @@ const Chat = () => {
   };
 
   const handleShowProfile = (userId, userName) => {
-    setSelectedUser({ id: userId, name: userName });
-    setShowProfileModal(true);
+    // 이미 DM 방에 있다면 이동하지 않음
+    if (location.pathname.includes("/chat/dm/") && dmUserIdParam === userId) {
+      return;
+    }
+    
+    navigateToDM(userId, user, navigate);
   };
 
   const handleCloseProfileModal = () => {
@@ -540,6 +616,7 @@ const Chat = () => {
   // 경로 판단 변수들
   const isMainChat = location.pathname === "/chat/main";
   const isParkChat = parkIdParam && location.pathname.includes("/chat/park/");
+  const isDmChat = dmUserIdParam && location.pathname.includes("/chat/dm/");
 
   // 로딩 상태
   if (loading) {
@@ -580,10 +657,10 @@ const Chat = () => {
                 )}
                 <div>
                   <h1 className="text-2xl font-bold text-gray-800">
-                    {parkIdParam ? `${currentPark?.name} 채팅방` : "탑골톡 💬"}
+                    {isDmChat ? (targetUserInfo ? `${targetUserInfo.name}님과의 대화` : "1:1 대화") : parkIdParam ? `${currentPark?.name} 채팅방` : "탑골톡 💬"}
                   </h1>
                   <p className="text-gray-600 mt-1">
-                    {parkIdParam ? `${currentPark?.location} • 공원별 채팅방` : "실시간 채팅방"}
+                    {isDmChat ? `개인 대화방` : parkIdParam ? `${currentPark?.location} • 공원별 채팅방` : "실시간 채팅방"}
                   </p>
                 </div>
               </div>
@@ -660,7 +737,7 @@ const Chat = () => {
                 messages.map((message) => {
                   const isMyMessage = isMessageAuthor(message);
                   return (
-                    <div key={message.id} className={`flex ${isMyMessage ? 'justify-start' : 'justify-end'} mb-3 ${
+                    <div key={message.id} className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'} mb-3 ${
                       isAdmin(message.authorEmail) ? 'relative' : ''
                     }`}>
                       {isAdmin(message.authorEmail) && (
@@ -670,13 +747,13 @@ const Chat = () => {
                           </svg>
                         </div>
                       )}
-                      {isMyMessage && (
+                      {!isMyMessage && (
                         <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 mr-2">
-                          {userData?.nickname?.[0] || userData?.name?.[0] || user.displayName?.[0] || "나"}
+                          {userData?.nickname?.[0] || userData?.name?.[0] || user?.displayName?.[0] || "나"}
                         </div>
                       )}
                       <div 
-                        className={`max-w-xs lg:max-w-md ${isMyMessage ? 'order-1' : 'order-2'}`}
+                        className={`max-w-xs lg:max-w-md ${isMyMessage ? 'order-2' : 'order-1'}`}
                       >
                         {isMyMessage && (
                           <div className="flex items-center space-x-2 mb-1">
@@ -751,7 +828,7 @@ const Chat = () => {
                                 <span 
                                   className="text-xs cursor-pointer transition-colors"
                                   onClick={() => handleShowProfile(message.authorId || message.userId, message.author || message.authorName)}
-                                  title="프로필 보기"
+                                  title="1:1 채팅하기"
                                 >
                                   • {(() => {
                                     const authorName = message.author || message.authorName || "익명";
@@ -825,11 +902,11 @@ const Chat = () => {
                           </div>
                         )}
                       </div>
-                      {!isMyMessage && (
+                      {isMyMessage && (
                         <div 
                           className="w-8 h-8 bg-amber-600 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 ml-2 cursor-pointer hover:bg-amber-700 transition-colors"
                           onClick={() => handleShowProfile(message.authorId || message.userId, message.author || message.authorName)}
-                          title="프로필 보기"
+                          title="1:1 채팅하기"
                         >
                           {(message.author || message.authorName || "익명")[0]}
                         </div>
@@ -875,7 +952,7 @@ const Chat = () => {
               <form onSubmit={handleSubmitMessage}>
                 <div className="flex space-x-3">
                   <div className="w-8 h-8 bg-amber-600 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
-                    {userData?.nickname?.[0] || userData?.name?.[0] || user.displayName?.[0] || "익"}
+                    {userData?.nickname?.[0] || userData?.name?.[0] || user?.displayName?.[0] || "익"}
                   </div>
                   <div className="flex-1">
                     <textarea

@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { auth } from "../util/firebase";
-import { onAuthStateChanged } from "firebase/auth";
-import { getKaraokePosts, toggleLike, incrementViews } from "../util/karaokeService";
+import { getKaraokePosts, toggleLike, incrementViews, uploadKaraokeThumbnail, updateKaraokePost } from "../util/karaokeService";
 import UserProfileModal from './UserProfileModal';
+import { navigateToDM } from '../util/dmUtils';
+import { ref, getDownloadURL } from "firebase/storage";
+import { storage } from "../util/firebase";
+import { cleanupInvalidKaraokePosts } from "../util/cleanupKaraoke";
+import "../util/manualCleanup";
+import { useAuth } from '../contexts/AuthContext';
 
 const Karaoke = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [posts, setPosts] = useState([]);
-  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -17,12 +21,10 @@ const Karaoke = () => {
   const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      loadKaraokePosts();
-    });
+    loadKaraokePosts();
 
-    return () => unsubscribe();
+    // 개발자 도구에서 정리 함수 사용 가능하도록 설정
+    window.cleanupKaraoke = cleanupInvalidKaraokePosts;
   }, []);
 
   const loadKaraokePosts = async () => {
@@ -30,13 +32,113 @@ const Karaoke = () => {
       setLoading(true);
       setError(null);
       const postsData = await getKaraokePosts();
-      setPosts(postsData);
+      
+      // 비디오 URL이 있는 게시글만 표시
+      const videoOnly = Array.isArray(postsData) ? postsData.filter((p) => !!p.videoUrl) : [];
+      
+      // 비디오 파일 존재 여부 확인 (비동기)
+      const validPosts = [];
+      const invalidPosts = [];
+      
+      for (const post of videoOnly) {
+        try {
+          if (post.videoFileName) {
+            const videoRef = ref(storage, `karaoke/${post.videoFileName}`);
+            await getDownloadURL(videoRef);
+            validPosts.push(post);
+          } else {
+            // 파일명이 없는 경우는 일단 유효한 것으로 간주
+            validPosts.push(post);
+          }
+        } catch (error) {
+          if (error.code === 'storage/object-not-found') {
+            invalidPosts.push(post);
+            console.log(`무효한 비디오 게시물 발견: ${post.id} - ${post.title || '제목 없음'}`);
+          } else {
+            // 다른 오류는 일단 유효한 것으로 간주
+            validPosts.push(post);
+          }
+        }
+      }
+      
+      if (invalidPosts.length > 0) {
+        console.log(`${invalidPosts.length}개의 무효한 비디오 게시물이 필터링되었습니다.`);
+      }
+      
+      setPosts(validPosts);
+
+      // 썸네일이 없는 기존 게시물 처리 (백그라운드)
+      try {
+        const targets = videoOnly.filter(p => !p.thumbnailUrl);
+        for (const post of targets) {
+          await generateAndSaveThumbnail(post);
+        }
+      } catch (thumbErr) {
+        console.warn("기존 게시물 썸네일 생성 중 일부 실패:", thumbErr);
+      }
     } catch (error) {
       console.error("노래자랑 게시글 로드 오류:", error);
       setError("게시글을 불러오는데 실패했습니다.");
     } finally {
       setLoading(false);
     }
+  };
+  // Storage URL 정규화 (잘못 저장된 버킷/도메인 보정)
+  const normalizeStorageUrl = (url) => {
+    if (!url || typeof url !== 'string') return url;
+    const fixAll = (s, from, to) => (s || '').split(from).join(to);
+    let fixed = url;
+    fixed = fixAll(fixed, 'tabgol-4f728.firebasestorage.app', 'tabgol-4f728.appspot.com');
+    fixed = fixAll(fixed, 'b/tabgol-4f728.firebasestorage.app', 'b/tabgol-4f728.appspot.com');
+    fixed = fixAll(fixed, 'https://firebasestorage.app', 'https://firebasestorage.googleapis.com');
+    return fixed;
+  };
+
+  // 기존 게시글 썸네일 생성 및 저장
+  const generateAndSaveThumbnail = async (post) => {
+    if (!post?.videoUrl) return;
+    // googleapis 도메인에서 클라이언트 캡처 시 CORS 발생 → 건너뜀
+    if (normalizeStorageUrl(post.videoUrl).includes('firebasestorage.googleapis.com')) {
+      return;
+    }
+    // 캡처
+    const blob = await new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.src = normalizeStorageUrl(post.videoUrl);
+      video.crossOrigin = 'anonymous';
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      video.addEventListener('loadeddata', async () => {
+        try {
+          video.currentTime = Math.min(1, video.duration || 1);
+          const onSeeked = async () => {
+            const canvas = document.createElement('canvas');
+            const maxW = 640;
+            const scale = Math.min(1, maxW / (video.videoWidth || 640));
+            canvas.width = Math.max(1, Math.floor((video.videoWidth || 640) * scale));
+            canvas.height = Math.max(1, Math.floor((video.videoHeight || 360) * scale));
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob((b) => {
+              if (b) resolve(b); else reject(new Error('썸네일 생성 실패'));
+            }, 'image/jpeg', 0.85);
+          };
+          video.addEventListener('seeked', onSeeked, { once: true });
+        } catch (err) { reject(err); }
+      }, { once: true });
+      video.onerror = reject;
+    });
+
+    // 업로드 및 문서 업데이트
+    const uploaded = await uploadKaraokeThumbnail(blob, post.authorId || 'unknown');
+    await updateKaraokePost(post.id, {
+      thumbnailUrl: uploaded.url,
+      thumbnailFileName: uploaded.fileName
+    });
+
+    // 로컬 상태 반영
+    setPosts(prev => prev.map(p => p.id === post.id ? { ...p, thumbnailUrl: uploaded.url, thumbnailFileName: uploaded.fileName } : p));
   };
 
   const handlePostClick = async (postId) => {
@@ -123,7 +225,7 @@ const Karaoke = () => {
           <div className="max-w-4xl mx-auto px-4">
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-700 mx-auto mb-4"></div>
-              <p className="text-amber-700">노래자랑 영상을 불러오는 중...</p>
+              <p className="text-amber-700">비디오를 불러오는 중...</p>
             </div>
           </div>
         </main>
@@ -157,7 +259,7 @@ const Karaoke = () => {
         <div className="max-w-4xl mx-auto px-4">
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
-              <h1 className="text-2xl font-bold text-gray-800">노래자랑</h1>
+              <h1 className="text-2xl font-bold text-gray-800">비디오</h1>
               <button
                 onClick={handleUploadClick}
                 className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center space-x-2"
@@ -168,19 +270,19 @@ const Karaoke = () => {
                 <span>업로드</span>
               </button>
             </div>
-                           <p className="text-gray-600">노래자랑 영상을 공유하고 소통해보세요</p>
+                           <p className="text-gray-600">비디오를 공유하고 소통해보세요</p>
           </div>
 
           {posts.length === 0 ? (
             <div className="text-center py-12">
-              <div className="text-gray-400 text-6xl mb-4">🎤</div>
-                             <p className="text-gray-600 text-lg mb-2">아직 노래자랑 영상이 없습니다</p>
-                             <p className="text-gray-500 mb-6">첫 번째 노래자랑 영상을 업로드해보세요!</p>
+              <div className="text-gray-400 text-6xl mb-4">🎬</div>
+                             <p className="text-gray-600 text-lg mb-2">아직 비디오가 없습니다</p>
+                             <p className="text-gray-500 mb-6">첫 번째 비디오를 업로드해보세요!</p>
               <button
                 onClick={handleUploadClick}
                 className="bg-amber-600 text-white px-6 py-3 rounded-lg hover:bg-amber-700 transition-colors"
               >
-                                 노래자랑 영상 업로드하기
+                                 비디오 업로드하기
               </button>
             </div>
           ) : (
@@ -194,11 +296,24 @@ const Karaoke = () => {
                   <div className="relative">
                     <div className="w-full h-48 bg-gray-200 flex items-center justify-center relative overflow-hidden">
                       <video
-                        src={post.videoUrl}
+                        src={normalizeStorageUrl(post.videoUrl)}
                         className="w-full h-full object-cover"
                         muted
                         preload="metadata"
-                        poster=""
+                        poster={normalizeStorageUrl(post.thumbnailUrl) || ""}
+                        crossOrigin="anonymous"
+                        onError={(e) => {
+                          try {
+                            const el = e.currentTarget;
+                            console.log(`비디오 로딩 실패: ${post.videoUrl}`);
+                            // 파일이 존재하지 않는 경우 placeholder 표시
+                            el.style.display = 'none';
+                            const placeholder = el.parentElement.querySelector('.video-placeholder');
+                            if (placeholder) {
+                              placeholder.style.display = 'flex';
+                            }
+                          } catch {}
+                        }}
                         onLoadedMetadata={(e) => {
                           // 동영상 메타데이터 로드 후 첫 번째 프레임을 썸네일로 사용
                           const video = e.target;
@@ -207,7 +322,9 @@ const Karaoke = () => {
                           canvas.height = video.videoHeight;
                           const ctx = canvas.getContext('2d');
                           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                          video.style.backgroundImage = `url(${canvas.toDataURL()})`;
+                          if (!post.thumbnailUrl) {
+                            video.style.backgroundImage = `url(${canvas.toDataURL()})`;
+                          }
                           video.style.backgroundSize = 'cover';
                           video.style.backgroundPosition = 'center';
                         }}
@@ -230,6 +347,13 @@ const Karaoke = () => {
                           }
                         }}
                       />
+                      {/* 비디오 로딩 실패 시 표시할 placeholder */}
+                      <div className="video-placeholder absolute inset-0 bg-gray-300 flex items-center justify-center text-gray-600" style={{display: 'none'}}>
+                        <div className="text-center">
+                          <div className="text-4xl mb-2">🎬</div>
+                          <div className="text-sm">비디오를 불러올 수 없습니다</div>
+                        </div>
+                      </div>
                       <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
                         <div className="bg-white bg-opacity-20 rounded-full p-3 backdrop-blur-sm">
                           <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -241,7 +365,7 @@ const Karaoke = () => {
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
                         </svg>
-                        <span>노래자랑</span>
+                        <span>비디오</span>
                       </div>
                     </div>
                     <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded flex items-center space-x-1">
@@ -263,9 +387,9 @@ const Karaoke = () => {
                           className="font-medium text-gray-800 hover:text-amber-600 cursor-pointer transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleShowProfile(post.authorId, post.author);
+                            navigateToDM(post.authorId, user, navigate);
                           }}
-                          title="프로필 보기"
+                          title="1:1 채팅하기"
                         >
                           {post.author}
                         </span>

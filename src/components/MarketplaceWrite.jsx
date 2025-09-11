@@ -96,7 +96,7 @@ const MarketplaceWrite = () => {
         location: location.trim(),
         images: imageUrls,
         authorId: user.uid,
-        authorName: user.displayName || user.email
+        author: user?.displayName || user?.email
       };
 
       await createMarketplacePost(postData);

@@ -69,7 +69,7 @@ const BoardWrite = () => {
         title: form.title.trim(),
         content: form.content.trim(),
         category: form.category,
-        author: userData?.nickname || userData?.name || user.displayName || "익명",
+        author: userData?.nickname || userData?.name || user?.displayName || "익명",
         authorId: user.uid,
         authorEmail: user.email
       };
@@ -123,7 +123,7 @@ const BoardWrite = () => {
             <div className="flex items-center space-x-2 text-sm text-gray-600">
               <span>작성자:</span>
               <span className="font-semibold text-amber-700">
-                {userData?.nickname || userData?.name || user.displayName || "익명"}
+                {userData?.nickname || userData?.name || user?.displayName || "익명"}
               </span>
             </div>
           </div>

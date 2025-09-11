@@ -11,6 +11,11 @@ export const isAdmin = (userEmail) => {
   return ADMIN_EMAILS.includes(userEmail);
 };
 
+// 현재 사용자가 관리자인지 확인하는 함수
+export const isCurrentUserAdmin = (currentUser) => {
+  return currentUser && ADMIN_EMAILS.includes(currentUser.email);
+};
+
 // 관리자 표시 컴포넌트를 위한 스타일
 export const getAdminStyles = () => ({
   container: "inline-flex items-center space-x-1",

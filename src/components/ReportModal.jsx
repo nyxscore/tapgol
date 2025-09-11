@@ -30,6 +30,10 @@ const ReportModal = ({
     setError("");
 
     try {
+      // 디버깅: targetData 확인
+      console.log("신고 대상 데이터:", targetData);
+      console.log("신고 유형:", targetType);
+      
       // 중복 신고 확인
       const isDuplicate = await checkDuplicateReport(
         targetData.id, 

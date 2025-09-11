@@ -6,8 +6,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { FaArrowLeft, FaEdit, FaTrash, FaEye, FaHeart, FaFlag } from 'react-icons/fa';
 import CommentSection from './CommentSection';
 import UserProfileModal from './UserProfileModal';
+import { navigateToDM } from '../util/dmUtils';
 import ReportModal from './ReportModal';
-import { formatAdminName, isAdmin, getEnhancedAdminStyles } from '../util/adminUtils';
+import { formatAdminName, isAdmin, getEnhancedAdminStyles, isCurrentUserAdmin } from '../util/adminUtils';
 
 const CookingDetail = () => {
   const navigate = useNavigate();
@@ -33,16 +34,26 @@ const CookingDetail = () => {
 
   const loadPost = async () => {
     try {
+      console.log('CookingDetail 로드 시작, ID:', id);
       const docRef = doc(db, "cookingPosts", id);
+      console.log('Firestore 문서 참조:', docRef);
+      
       const docSnap = await getDoc(docRef);
+      console.log('문서 스냅샷:', docSnap);
+      console.log('문서 존재 여부:', docSnap.exists());
       
       if (docSnap.exists()) {
-        setPost({ id: docSnap.id, ...docSnap.data() });
+        const postData = { id: docSnap.id, ...docSnap.data() };
+        console.log('게시글 데이터:', postData);
+        setPost(postData);
+        
         // 조회수 증가
         await updateDoc(docRef, {
           views: increment(1)
         });
+        console.log('조회수 증가 완료');
       } else {
+        console.log('문서가 존재하지 않음');
         setError("요리 게시글을 찾을 수 없습니다.");
       }
     } catch (error) {
@@ -54,6 +65,11 @@ const CookingDetail = () => {
   };
 
   const handleDelete = async () => {
+    if (!user || (user.uid !== post.authorId && !isCurrentUserAdmin(user))) {
+      alert("삭제 권한이 없습니다.");
+      return;
+    }
+
     if (!window.confirm("정말로 이 요리 게시글을 삭제하시겠습니까?")) {
       return;
     }
@@ -189,6 +205,7 @@ const CookingDetail = () => {
   if (!post) return null;
 
   const isAuthor = user && post.authorId === user.uid;
+  const canEditDelete = isAuthor || isCurrentUserAdmin(user);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
@@ -216,10 +233,16 @@ const CookingDetail = () => {
                   <p className="text-gray-600 mt-1">맛있는 요리 레시피와 요리 팁</p>
                 </div>
               </div>
-              {isAuthor && (
+              {canEditDelete && (
                 <div className="flex space-x-2">
                   <button
-                    onClick={() => navigate(`/cooking/edit/${id}`)}
+                    onClick={() => {
+                      if (!user || (user.uid !== post.authorId && !isCurrentUserAdmin(user))) {
+                        alert("수정 권한이 없습니다.");
+                        return;
+                      }
+                      navigate(`/cooking/edit/${id}`);
+                    }}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
                   >
                     <FaEdit className="text-sm" />
@@ -271,8 +294,8 @@ const CookingDetail = () => {
                 <span className="text-gray-500">작성자</span>
                 <div 
                   className="cursor-pointer transition-colors"
-                  onClick={() => handleShowProfile(post.authorId, post.author || "익명")}
-                  title="프로필 보기"
+                  onClick={() => navigateToDM(post.authorId, user, navigate)}
+                  title="1:1 채팅하기"
                 >
                   {(() => {
                     const adminInfo = formatAdminName(post.author || "익명", post.authorEmail);
@@ -343,32 +366,72 @@ const CookingDetail = () => {
               <div className="border-t border-gray-200 pt-6">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">요리 사진</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {post.images.map((imageUrl, index) => (
-                    <div key={index} className="relative group">
-                      <img
-                        src={imageUrl}
-                        alt={`요리 사진 ${index + 1}`}
-                        className="w-full h-48 object-cover rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer"
-                        onClick={() => {
-                          // 이미지 확대 보기 (간단한 모달)
-                          const newWindow = window.open();
-                          newWindow.document.write(`
-                            <html>
-                              <head><title>요리 사진</title></head>
-                              <body style="margin:0; padding:20px; background:#000; display:flex; justify-content:center; align-items:center; min-height:100vh;">
-                                <img src="${imageUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />
-                              </body>
-                            </html>
-                          `);
-                        }}
-                      />
-                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity text-white text-sm font-medium">
-                          클릭하여 확대보기
+                  {post.images.map((imageUrl, index) => {
+                    // 잘못된 URL 필터링 (더 엄격한 검증)
+                    const isValidUrl = imageUrl && 
+                      imageUrl.startsWith('https://firebasestorage.googleapis.com') &&
+                      imageUrl.includes('alt=media') &&
+                      imageUrl.includes('token=');
+                    
+                    console.log(`이미지 ${index + 1} URL 검증:`, {
+                      url: imageUrl,
+                      isValid: isValidUrl
+                    });
+                    
+                    if (!isValidUrl) {
+                      return (
+                        <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+                          <div className="w-full h-48 bg-yellow-100 flex items-center justify-center text-yellow-700">
+                            <div className="text-center">
+                              <div className="text-2xl mb-2">⚠️</div>
+                              <div className="text-sm">잘못된 이미지 URL</div>
+                              <div className="text-xs mt-1 break-all">{imageUrl}</div>
+                            </div>
+                          </div>
                         </div>
+                      );
+                    }
+                    
+                    return (
+                      <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+                        <img
+                          src={imageUrl}
+                          alt={`요리 사진 ${index + 1}`}
+                          className="w-full h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onLoad={() => {
+                            console.log(`이미지 ${index + 1} 로드 성공:`, imageUrl);
+                          }}
+                          onError={(e) => {
+                            console.error(`이미지 ${index + 1} 로드 실패:`, imageUrl);
+                            e.target.style.display = 'none';
+                            // 오류 시 대체 텍스트 표시
+                            const container = e.target.parentElement;
+                            container.innerHTML = `
+                              <div class="w-full h-48 bg-red-100 flex items-center justify-center text-red-700">
+                                <div class="text-center">
+                                  <div class="text-2xl mb-2">❌</div>
+                                  <div class="text-sm">이미지 로드 실패</div>
+                                  <div class="text-xs mt-1 break-all">${imageUrl}</div>
+                                </div>
+                              </div>
+                            `;
+                          }}
+                          onClick={() => {
+                            // 이미지 확대 보기 (간단한 모달)
+                            const newWindow = window.open();
+                            newWindow.document.write(`
+                              <html>
+                                <head><title>요리 사진</title></head>
+                                <body style="margin:0; padding:20px; background:#000; display:flex; justify-content:center; align-items:center; min-height:100vh;">
+                                  <img src="${imageUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />
+                                </body>
+                              </html>
+                            `);
+                          }}
+                        />
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -420,6 +483,7 @@ const CookingDetail = () => {
                         <CommentSection 
                           postId={id} 
                           postType="cooking"
+                          boardType="cooking"
                         />
                       </div>
                     </div>

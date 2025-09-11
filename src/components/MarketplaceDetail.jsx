@@ -3,10 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getMarketplacePost, updateMarketplacePost, deleteMarketplacePost, incrementViews, toggleSoldStatus } from '../util/marketplaceService';
 import { FaArrowLeft, FaEdit, FaTrash, FaPhone, FaComment, FaHeart, FaShare, FaFlag } from 'react-icons/fa';
-import CommentSection from './CommentSection';
+// import CommentSection from './CommentSection';
 import UserProfileModal from './UserProfileModal';
+import { navigateToDM } from '../util/dmUtils';
 import ReportModal from './ReportModal';
-import { formatAdminName, isAdmin, getEnhancedAdminStyles } from '../util/adminUtils';
+import { formatAdminName, isAdmin, getEnhancedAdminStyles, isCurrentUserAdmin } from '../util/adminUtils';
 
 const MarketplaceDetail = () => {
   const [post, setPost] = useState(null);
@@ -65,7 +66,7 @@ const MarketplaceDetail = () => {
   };
 
   const handleDelete = async () => {
-    if (!user || !post || post.authorId !== user.uid) {
+    if (!user || !post || (post.authorId !== user.uid && !isCurrentUserAdmin(user))) {
       alert('삭제 권한이 없습니다.');
       return;
     }
@@ -209,10 +210,16 @@ const MarketplaceDetail = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
               </svg>
             </button>
-            {user && post.authorId === user.uid && (
+            {user && (post.authorId === user.uid || isCurrentUserAdmin(user)) && (
               <div className="flex gap-2">
                 <button
-                  onClick={() => navigate(`/marketplace/edit/${id}`)}
+                  onClick={() => {
+                    if (!user || (post.authorId !== user.uid && !isCurrentUserAdmin(user))) {
+                      alert("수정 권한이 없습니다.");
+                      return;
+                    }
+                    navigate(`/marketplace/edit/${id}`);
+                  }}
                   className="flex items-center gap-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm"
                 >
                   <FaEdit />
@@ -328,64 +335,20 @@ const MarketplaceDetail = () => {
               {post.description || '상품 설명이 없습니다.'}
             </p>
           </div>
+          {/* 판매자 1:1 문의 버튼 */}
+          {user && user.uid !== post.authorId && (
+            <div className="mt-6">
+              <button
+                onClick={() => navigateToDM(post.authorId, user, navigate)}
+                className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                판매자 1:1 문의
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* 판매자 정보 */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">판매자 정보</h2>
-          <div className="flex items-center justify-between">
-            <div>
-              <p 
-                className="cursor-pointer transition-colors"
-                onClick={() => handleShowProfile(post.authorId, post.author || '익명')}
-                title="프로필 보기"
-              >
-                {(() => {
-                  const adminInfo = formatAdminName(post.author || '익명', post.authorEmail);
-                  if (adminInfo.isAdmin) {
-                    return (
-                      <span className="inline-flex items-center space-x-1">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg">
-                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          {adminInfo.badgeText}
-                        </span>
-                        <span className="font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                          {adminInfo.name}
-                        </span>
-                      </span>
-                    );
-                  }
-                  return adminInfo.name;
-                })()}
-              </p>
-              <p className="text-sm text-gray-500">{post.location || '위치 미설정'}</p>
-            </div>
-            <div className="flex gap-2">
-              <button className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors">
-                <FaPhone />
-                연락하기
-              </button>
-              
-              {/* 신고 버튼 - 작성자가 아닌 경우에만 표시 */}
-              {user && user.uid !== post.authorId && (
-                <button
-                  onClick={handleReport}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 hover:text-purple-800 transition-colors"
-                  title="게시글 신고"
-                >
-                  <FaFlag />
-                  신고
-                </button>
-              )}
-              <button className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
-                <FaComment />
-                채팅
-              </button>
-            </div>
-          </div>
-        </div>
+        
 
         {/* 판매 상태 변경 */}
         {user && post.authorId === user.uid && (
@@ -411,10 +374,7 @@ const MarketplaceDetail = () => {
           </div>
         )}
 
-        {/* 댓글 섹션 */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <CommentSection postId={id} postType="marketplace" />
-        </div>
+        {/* 중고장터 댓글 기능 제거됨 */}
 
         {/* 삭제 확인 모달 */}
         {showDeleteConfirm && (

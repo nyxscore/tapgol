@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { db } from '../util/firebase';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { getMarketplacePosts } from '../util/marketplaceService';
 import { FaPlus, FaSearch, FaFilter } from 'react-icons/fa';
 import UserProfileModal from './UserProfileModal';
+import { navigateToDM } from '../util/dmUtils';
 
 const Marketplace = () => {
   const [posts, setPosts] = useState([]);
@@ -30,7 +33,41 @@ const Marketplace = () => {
   ];
 
   useEffect(() => {
-    loadPosts();
+    // 실시간 중고장터 게시글 구독 (최적화된 쿼리)
+    const q = query(
+      collection(db, "marketplace"),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribePosts = onSnapshot(q, 
+      { includeMetadataChanges: true }, // 메타데이터 변경도 감지하여 삭제 즉시 반영
+      (querySnapshot) => {
+        const postsData = [];
+        querySnapshot.forEach((doc) => {
+          // 삭제된 문서는 제외
+          if (doc.exists()) {
+            postsData.push({
+              id: doc.id,
+              ...doc.data()
+            });
+          }
+        });
+        setPosts(postsData);
+        setLoading(false);
+      }, 
+      (error) => {
+        console.error('중고장터 게시글 실시간 구독 오류:', error);
+        // BloomFilter 오류는 무시 (기능에 영향 없음)
+        if (error.name !== 'BloomFilterError') {
+          setError('게시글을 불러오는데 실패했습니다. 다시 시도해주세요.');
+          setLoading(false);
+        }
+      }
+    );
+
+    return () => {
+      unsubscribePosts();
+    };
   }, []);
 
   const loadPosts = async () => {
@@ -255,7 +292,7 @@ const Marketplace = () => {
                         className="text-gray-600 hover:text-amber-600 cursor-pointer transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleShowProfile(post.authorId, post.author || "익명");
+                          navigateToDM(post.authorId, user, navigate);
                         }}
                         title="프로필 보기"
                       >

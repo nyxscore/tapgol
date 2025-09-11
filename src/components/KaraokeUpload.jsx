@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getUserProfile } from "../util/userService";
-import { uploadKaraokeVideo, createKaraokePost, getFileType } from "../util/karaokeService";
+import { uploadKaraokeVideo, uploadKaraokeThumbnail, createKaraokePost, getFileType } from "../util/karaokeService";
 
 const KaraokeUpload = () => {
   const navigate = useNavigate();
@@ -58,7 +58,7 @@ const KaraokeUpload = () => {
       // 비디오 프리뷰 생성
       const video = document.createElement('video');
       video.src = URL.createObjectURL(file);
-      video.currentTime = 1; // 1초 지점에서 썸네일 생성
+      video.currentTime = 3; // 3초 지점에서 썸네일 생성
       
       video.addEventListener('loadeddata', () => {
         const canvas = document.createElement('canvas');
@@ -93,6 +93,40 @@ const KaraokeUpload = () => {
       // 비디오 업로드
       const uploadResult = await uploadKaraokeVideo(selectedFile, user.uid);
       
+      // 썸네일 생성 및 업로드
+      let thumbUpload = null;
+      try {
+        const capture = await new Promise((resolve, reject) => {
+          const video = document.createElement('video');
+          video.src = URL.createObjectURL(selectedFile);
+          video.preload = 'metadata';
+          video.muted = true;
+          video.playsInline = true;
+          video.addEventListener('loadeddata', async () => {
+            try {
+              video.currentTime = Math.min(3, video.duration || 3);
+              const onSeeked = async () => {
+                const canvas = document.createElement('canvas');
+                const maxW = 640;
+                const scale = Math.min(1, maxW / video.videoWidth || 1);
+                canvas.width = Math.max(1, Math.floor((video.videoWidth || 640) * scale));
+                canvas.height = Math.max(1, Math.floor((video.videoHeight || 360) * scale));
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob((blob) => {
+                  if (blob) resolve(blob); else reject(new Error('썸네일 블롭 생성 실패'));
+                }, 'image/jpeg', 0.85);
+              };
+              video.addEventListener('seeked', onSeeked, { once: true });
+            } catch (err) { reject(err); }
+          }, { once: true });
+          video.onerror = reject;
+        });
+        thumbUpload = await uploadKaraokeThumbnail(capture, user.uid);
+      } catch (thumbErr) {
+        console.warn('썸네일 생성/업로드 실패(무시 가능):', thumbErr);
+      }
+
       // 게시글 데이터 생성
       const postData = {
         title: title.trim(),
@@ -101,7 +135,9 @@ const KaraokeUpload = () => {
         fileName: uploadResult.fileName,
         fileType: selectedFile.type,
         fileSize: selectedFile.size,
-        author: userData?.nickname || userData?.name || user.displayName || "익명",
+        thumbnailUrl: thumbUpload?.url || null,
+        thumbnailFileName: thumbUpload?.fileName || null,
+        author: userData?.nickname || userData?.name || user?.displayName || "익명",
         authorId: user.uid,
         authorEmail: user.email
       };
@@ -109,7 +145,7 @@ const KaraokeUpload = () => {
       // Firestore에 게시글 저장
       await createKaraokePost(postData);
       
-             alert("노래자랑 영상이 업로드되었습니다!");
+             alert("비디오 영상이 업로드되었습니다!");
       navigate("/karaoke");
     } catch (error) {
       console.error("업로드 오류:", error);
@@ -153,8 +189,8 @@ const KaraokeUpload = () => {
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
           <div className="flex items-center justify-between">
             <div>
-                             <h1 className="text-2xl font-bold text-gray-800">노래자랑 영상 업로드</h1>
-               <p className="text-gray-600 mt-1">노래자랑 영상을 공유해보세요</p>
+              <h1 className="text-2xl font-bold text-gray-800">비디오 업로드</h1>
+              <p className="text-gray-600 mt-1">비디오를 공유해보세요</p>
             </div>
             <button
               onClick={handleCancel}
@@ -228,7 +264,7 @@ const KaraokeUpload = () => {
                   )}
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
-                    <p className="text-xs text-gray-500">노래자랑 영상</p>
+                    <p className="text-xs text-gray-500">비디오</p>
                   </div>
                 </div>
               </div>
@@ -243,7 +279,7 @@ const KaraokeUpload = () => {
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="노래 제목을 입력하세요"
+                placeholder="비디오 제목을 입력하세요"
                 maxLength="100"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                 required
@@ -261,7 +297,7 @@ const KaraokeUpload = () => {
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="노래에 대한 설명을 입력하세요..."
+                placeholder="비디오에 대한 설명을 입력하세요..."
                 rows="4"
                 maxLength="500"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"

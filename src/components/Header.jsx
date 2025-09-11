@@ -25,8 +25,8 @@ const Header = () => {
           console.error("사용자 정보 로드 오류:", error);
           // 기본 정보만 사용
           setUserData({
-            name: user.displayName || "사용자",
-            nickname: user.displayName || "사용자"
+            name: user?.displayName || "사용자",
+            nickname: user?.displayName || "사용자"
           });
           setIsAdmin(false);
         }
@@ -59,7 +59,7 @@ const Header = () => {
       return userData.name;
     }
     if (user?.displayName) {
-      return user.displayName;
+      return user?.displayName;
     }
     if (user?.email) {
       return user.email.split('@')[0]; // 이메일에서 @ 앞부분만

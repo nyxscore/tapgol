@@ -51,7 +51,8 @@ export const createMarketplacePost = async (postData) => {
       updatedAt: serverTimestamp(),
       sold: false,
       views: 0,
-      likes: 0
+      likes: 0,
+      commentCount: 0
     };
     
     const docRef = await addDoc(collection(db, "marketplace"), postWithTimestamp);
@@ -91,7 +92,7 @@ export const getMarketplacePosts = async (limitCount = 20) => {
           price: data.price || null,
           category: data.category || 'other',
           location: data.location || '',
-          author: data.author || '익명',
+          author: data.author || data.authorName || '익명',
           authorId: data.authorId || '',
           images: Array.isArray(data.images) ? data.images : [],
           sold: Boolean(data.sold),
@@ -313,7 +314,7 @@ export const getMarketplacePostsByCategory = async (category, limitCount = 20) =
           price: data.price || null,
           category: data.category || 'other',
           location: data.location || '',
-          author: data.author || '익명',
+          author: data.author || data.authorName || '익명',
           authorId: data.authorId || '',
           images: Array.isArray(data.images) ? data.images : [],
           sold: Boolean(data.sold),
@@ -368,7 +369,7 @@ export const getMarketplacePostsByUser = async (userId, limitCount = 20) => {
           price: data.price || null,
           category: data.category || 'other',
           location: data.location || '',
-          author: data.author || '익명',
+          author: data.author || data.authorName || '익명',
           authorId: data.authorId || '',
           images: Array.isArray(data.images) ? data.images : [],
           sold: Boolean(data.sold),

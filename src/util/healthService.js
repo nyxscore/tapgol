@@ -13,7 +13,8 @@ export const createHealthPost = async (postData) => {
       updatedAt: serverTimestamp(),
       views: 0,
       likes: 0,
-      likedBy: []
+      likedBy: [],
+      commentCount: 0
     };
     
     const docRef = await addDoc(collection(db, "healthPosts"), postWithTimestamp);

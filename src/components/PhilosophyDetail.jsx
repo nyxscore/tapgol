@@ -3,13 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import { auth, db } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getPhilosophyPost, deletePhilosophyPost, toggleLike, incrementViews } from "../util/philosophyService";
-import { markNotificationsByPostIdAsRead } from "../util/notificationService";
 import { formatTextWithLinks } from "../util/textUtils.jsx";
 import CommentSection from "./CommentSection";
 import UserProfileModal from "./UserProfileModal";
+import { navigateToDM } from '../util/dmUtils';
 import ReportModal from "./ReportModal";
 import { FaFlag } from 'react-icons/fa';
-import { formatAdminName, isAdmin, getAdminPostStyles, getEnhancedAdminStyles } from '../util/adminUtils';
+import { formatAdminName, isAdmin, getAdminPostStyles, getEnhancedAdminStyles, isCurrentUserAdmin } from '../util/adminUtils';
 
 const PhilosophyDetail = () => {
   const { id } = useParams();
@@ -50,8 +50,6 @@ const PhilosophyDetail = () => {
       // 로그인한 사용자라면 조회수 증가
       if (user) {
         await incrementViews(id);
-        // 알림 읽음 처리
-        await markNotificationsByPostIdAsRead(id);
       }
     } catch (error) {
       console.error("게시글 로드 오류:", error);
@@ -62,6 +60,11 @@ const PhilosophyDetail = () => {
   };
 
   const handleDelete = async () => {
+    if (!user || (user.uid !== post.authorId && !isCurrentUserAdmin(user))) {
+      alert("삭제 권한이 없습니다.");
+      return;
+    }
+
     if (!window.confirm("정말로 이 글을 삭제하시겠습니까?")) {
       return;
     }
@@ -77,6 +80,10 @@ const PhilosophyDetail = () => {
   };
 
   const handleEdit = () => {
+    if (!user || (user.uid !== post.authorId && !isCurrentUserAdmin(user))) {
+      alert("수정 권한이 없습니다.");
+      return;
+    }
     navigate(`/philosophy/edit/${id}`);
   };
 
@@ -238,7 +245,7 @@ const PhilosophyDetail = () => {
                 <span className="text-gray-500 text-xs mb-1">작성자</span>
                 <span 
                   className="cursor-pointer transition-colors"
-                  onClick={() => handleShowProfile(post.authorId, post.author)}
+                  onClick={() => navigateToDM(post.authorId, user, navigate)}
                   title="프로필 보기"
                 >
                   {(() => {
@@ -336,7 +343,7 @@ const PhilosophyDetail = () => {
               </div>
 
               {/* 작성자만 수정/삭제 버튼 표시 */}
-              {user && user.uid === post.authorId && (
+              {user && (user.uid === post.authorId || isCurrentUserAdmin(user)) && (
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={handleEdit}

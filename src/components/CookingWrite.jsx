@@ -109,13 +109,14 @@ const CookingWrite = () => {
         content: form.content.trim(),
         category: form.category,
         images: images.map(img => img.url), // 이미지 URL 배열 추가
-        author: user.displayName || user.email || '익명',
+        author: user?.displayName || user?.email || '익명',
         authorId: user.uid,
         authorEmail: user.email,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         views: 0,
-        likes: 0
+        likes: 0,
+        commentCount: 0
       };
 
       await addDoc(collection(db, "cookingPosts"), postData);

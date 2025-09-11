@@ -3,13 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import { auth, db } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getHealthPost, incrementViews, deleteHealthPost, toggleLike } from "../util/healthService";
-import { markNotificationsByPostIdAsRead } from "../util/notificationService";
 import { formatTextWithLinks } from "../util/textUtils.jsx";
 import CommentSection from "./CommentSection";
 import UserProfileModal from "./UserProfileModal";
+import { navigateToDM } from '../util/dmUtils';
 import ReportModal from "./ReportModal";
 import { FaFlag } from 'react-icons/fa';
-import { formatAdminName, isAdmin, getEnhancedAdminStyles } from '../util/adminUtils';
+import { formatAdminName, isAdmin, getEnhancedAdminStyles, isCurrentUserAdmin } from '../util/adminUtils';
 
 const HealthDetail = () => {
   const { id } = useParams();
@@ -41,16 +41,6 @@ const HealthDetail = () => {
         if (user) {
           await incrementViews(id);
           
-          // 이 게시글과 관련된 알림을 읽음 처리
-          try {
-            const processedCount = await markNotificationsByPostIdAsRead(id, "health");
-            if (processedCount > 0) {
-              console.log(`${processedCount}개의 건강정보 관련 알림이 읽음 처리되었습니다.`);
-            }
-          } catch (notificationError) {
-            console.error("알림 읽음 처리 오류:", notificationError);
-            // 알림 처리 실패는 게시글 보기에 영향을 주지 않도록 함
-          }
         }
       } catch (error) {
         console.error("건강정보 게시글 로드 오류:", error);
@@ -82,7 +72,7 @@ const HealthDetail = () => {
   };
 
   const handleDelete = async () => {
-    if (!user || user.uid !== post.authorId) {
+    if (!user || (user.uid !== post.authorId && !isCurrentUserAdmin(user))) {
       alert("삭제 권한이 없습니다.");
       return;
     }
@@ -105,6 +95,10 @@ const HealthDetail = () => {
   };
 
   const handleEdit = () => {
+    if (!user || (user.uid !== post.authorId && !isCurrentUserAdmin(user))) {
+      alert("수정 권한이 없습니다.");
+      return;
+    }
     navigate(`/health/edit/${id}`);
   };
 
@@ -164,6 +158,7 @@ const HealthDetail = () => {
 
   const isLiked = user && post?.likedBy?.includes(user.uid);
   const isAuthor = user && user.uid === post?.authorId;
+  const canEditDelete = isAuthor || isCurrentUserAdmin(user);
 
   if (loading) {
     return (
@@ -218,7 +213,7 @@ const HealthDetail = () => {
             </button>
             <h1 className="text-2xl font-bold text-gray-800">건강정보</h1>
             <div className="flex items-center space-x-2">
-              {isAuthor && (
+              {canEditDelete && (
                 <>
                   <button
                     onClick={handleEdit}
@@ -278,7 +273,7 @@ const HealthDetail = () => {
                 <span className="text-gray-500 text-xs mb-1">작성자</span>
                 <span 
                   className="cursor-pointer transition-colors"
-                  onClick={() => handleShowProfile(post.authorId, post.author)}
+                  onClick={() => navigateToDM(post.authorId, user, navigate)}
                   title="프로필 보기"
                 >
                   {(() => {

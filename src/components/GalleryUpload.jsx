@@ -40,12 +40,11 @@ const GalleryUpload = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // 파일 타입 검증
+    // 파일 타입 검증 - 이미지만 허용
     const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'];
     
-    if (!allowedImageTypes.includes(file.type) && !allowedVideoTypes.includes(file.type)) {
-      alert("지원하지 않는 파일 형식입니다.\n\n이미지: JPG, PNG, GIF, WEBP\n동영상: MP4, WEBM, OGG, MOV");
+    if (!allowedImageTypes.includes(file.type)) {
+      alert("지원하지 않는 파일 형식입니다.\n\n이미지만 업로드 가능합니다: JPG, PNG, GIF, WEBP");
       return;
     }
 
@@ -111,7 +110,7 @@ const GalleryUpload = () => {
         fileType: uploadResult.type,
         fileTypeCategory: getFileType(uploadResult.type),
         uploaderId: user.uid,
-        uploader: userData?.nickname || userData?.name || user.displayName || "익명",
+        uploader: userData?.nickname || userData?.name || user?.displayName || "익명",
         uploaderEmail: user.email
       };
 
@@ -187,7 +186,7 @@ const GalleryUpload = () => {
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-amber-400 transition-colors">
                 <input
                   type="file"
-                  accept="image/*,video/*"
+                  accept="image/*"
                   onChange={handleFileSelect}
                   className="hidden"
                   id="file-upload"
@@ -208,7 +207,7 @@ const GalleryUpload = () => {
                       <p className="text-xs">또는 드래그 앤 드롭</p>
                     </div>
                     <p className="text-xs text-gray-500">
-                      이미지: JPG, PNG, GIF, WEBP / 동영상: MP4, WEBM, OGG, MOV (최대 50MB)
+                      이미지: JPG, PNG, GIF, WEBP (최대 50MB)
                     </p>
                   </div>
                 </label>

@@ -10,7 +10,8 @@ import {
   where, 
   orderBy, 
   serverTimestamp,
-  setDoc
+  setDoc,
+  increment
 } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -33,6 +34,20 @@ export const createComment = async (postId, commentData, boardType = "board") =>
     
     const docRef = await addDoc(collection(db, "comments"), commentWithTimestamp);
     console.log("댓글 저장 성공, 문서 ID:", docRef.id);
+    
+    // 게시글의 commentCount 증가
+    try {
+      const collectionName = getCollectionName(boardType);
+      const postRef = doc(db, collectionName, postId);
+      await updateDoc(postRef, {
+        commentCount: increment(1),
+        updatedAt: serverTimestamp()
+      });
+      console.log("게시글 commentCount 증가 완료");
+    } catch (updateError) {
+      console.error("commentCount 업데이트 오류:", updateError);
+      // commentCount 업데이트 실패해도 댓글 작성은 성공으로 처리
+    }
     
     const result = { id: docRef.id, ...commentWithTimestamp };
     console.log("반환할 댓글 데이터:", result);
@@ -145,8 +160,33 @@ export const updateComment = async (commentId, updateData) => {
 // 댓글 삭제
 export const deleteComment = async (commentId) => {
   try {
+    // 먼저 댓글 정보를 가져와서 게시글 ID와 게시판 타입 확인
     const commentRef = doc(db, "comments", commentId);
+    const commentSnap = await getDoc(commentRef);
+    
+    if (!commentSnap.exists()) {
+      throw new Error("댓글을 찾을 수 없습니다.");
+    }
+    
+    const commentData = commentSnap.data();
+    const { postId, boardType } = commentData;
+    
+    // 댓글 삭제
     await deleteDoc(commentRef);
+    
+    // 게시글의 commentCount 감소
+    try {
+      const collectionName = getCollectionName(boardType);
+      const postRef = doc(db, collectionName, postId);
+      await updateDoc(postRef, {
+        commentCount: increment(-1),
+        updatedAt: serverTimestamp()
+      });
+      console.log("게시글 commentCount 감소 완료");
+    } catch (updateError) {
+      console.error("commentCount 업데이트 오류:", updateError);
+      // commentCount 업데이트 실패해도 댓글 삭제는 성공으로 처리
+    }
   } catch (error) {
     console.error("댓글 삭제 오류:", error);
     throw new Error("댓글 삭제에 실패했습니다.");
@@ -382,6 +422,22 @@ export const migrateComments = async () => {
     console.error("댓글 마이그레이션 오류:", error);
     throw error;
   }
+};
+
+// 게시판 타입에 따른 컬렉션 이름 반환
+const getCollectionName = (boardType) => {
+  const collectionMap = {
+    'board': 'posts',
+    'gallery': 'gallery',
+    'health': 'healthPosts',
+    'karaoke': 'karaokePosts',
+    'cooking': 'cookingPosts',
+    'philosophy': 'philosophy',
+    'marketplace': 'marketplace',
+    'wisdom': 'wisdoms'
+  };
+  
+  return collectionMap[boardType] || 'posts';
 };
 
 

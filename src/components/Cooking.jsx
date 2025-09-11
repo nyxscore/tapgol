@@ -4,9 +4,12 @@ import { collection, getDocs, orderBy, query } from 'firebase/firestore';
 import { db } from '../util/firebase';
 import { FaPlus, FaSearch } from 'react-icons/fa';
 import UserProfileModal from './UserProfileModal';
+import { navigateToDM } from '../util/dmUtils';
+import { useAuth } from '../contexts/AuthContext';
 
 const Cooking = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -124,7 +127,11 @@ const Cooking = () => {
                 {filteredPosts.map((post) => (
                   <div
                     key={post.id}
-                    onClick={() => navigate(`/cooking/${post.id}`)}
+                    onClick={() => {
+                      console.log('요리게시판 클릭:', post.id);
+                      console.log('이동할 URL:', `/cooking/${post.id}`);
+                      navigate(`/cooking/${post.id}`);
+                    }}
                     className="p-4 border border-gray-200 rounded-lg hover:border-amber-300 hover:shadow-md transition-all cursor-pointer"
                   >
                     <div className="flex items-start justify-between">
@@ -136,6 +143,31 @@ const Cooking = () => {
                           {post.content}
                         </p>
                         
+                        {/* 이미지 미리보기 */}
+                        {post.images && post.images.length > 0 && (
+                          <div className="mb-3">
+                            <div className="flex space-x-2">
+                              {post.images.slice(0, 3).map((imageUrl, index) => (
+                                <img
+                                  key={index}
+                                  src={imageUrl}
+                                  alt={`요리 사진 ${index + 1}`}
+                                  className="w-16 h-16 object-cover rounded border"
+                                  onError={(e) => {
+                                    console.error(`목록 이미지 로드 실패:`, imageUrl);
+                                    e.target.style.display = 'none';
+                                  }}
+                                />
+                              ))}
+                              {post.images.length > 3 && (
+                                <div className="w-16 h-16 bg-gray-200 rounded border flex items-center justify-center text-xs text-gray-500">
+                                  +{post.images.length - 3}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
                         {/* Post Details Grid */}
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
@@ -144,9 +176,9 @@ const Cooking = () => {
                               className="font-medium text-gray-700 hover:text-amber-600 cursor-pointer transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleShowProfile(post.authorId, post.author || "익명");
+                                navigateToDM(post.authorId, user, navigate);
                               }}
-                              title="프로필 보기"
+                              title="1:1 채팅하기"
                             >
                               {post.author || "익명"}
                             </div>

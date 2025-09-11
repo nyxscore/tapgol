@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }) => {
     // 세션 지속성을 브라우저 세션으로 설정 (탭/창을 닫으면 로그아웃)
     setPersistence(auth, browserSessionPersistence);
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       setLoading(false);
       if (user) {

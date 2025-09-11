@@ -58,7 +58,7 @@ const HealthWrite = () => {
         title: form.title.trim(),
         content: form.content.trim(),
         category: form.category,
-        author: userData?.nickname || userData?.name || user.displayName || "익명",
+        author: userData?.nickname || userData?.name || user?.displayName || "익명",
         authorId: user.uid,
         authorEmail: user.email
       };

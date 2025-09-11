@@ -24,6 +24,7 @@ export const createPost = async (postData) => {
       updatedAt: serverTimestamp(),
       views: 0,
       likes: 0,
+      commentCount: 0,
       comments: []
     };
     

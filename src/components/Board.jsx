@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { auth } from "../util/firebase";
+import { auth, db } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
 import { getPosts } from "../util/postService";
 import UserProfileModal from './UserProfileModal';
+import { navigateToDM } from '../util/dmUtils';
 
 const Board = () => {
   const [posts, setPosts] = useState([]);
@@ -21,47 +23,42 @@ const Board = () => {
       setUser(currentUser);
     });
 
-    // 게시글 데이터 로드
-    const loadPosts = async () => {
-      try {
-        const postsData = await getPosts(20);
-        setPosts(postsData);
-      } catch (error) {
-        console.error("게시글 로드 오류:", error);
-        // 에러 시 기본 데이터 표시
-        setPosts([
-          {
-            id: 1,
-            title: "탑골공원에서 만난 할머니",
-            author: "김할배",
-            date: "2024-01-15",
-            views: 156,
-            likes: 23,
-          },
-          {
-            id: 2,
-            title: "오늘 바둑 대회 결과",
-            author: "이장로",
-            date: "2024-01-14",
-            views: 89,
-            likes: 15,
-          },
-          {
-            id: 3,
-            title: "새로운 운동 기구 설치",
-            author: "박어르신",
-            date: "2024-01-13",
-            views: 234,
-            likes: 45,
-          },
-        ]);
-      } finally {
-        setLoading(false);
-      }
-    };
+    // 실시간 게시글 구독 (최적화된 쿼리)
+    const q = query(
+      collection(db, "posts"),
+      orderBy("createdAt", "desc"),
+      limit(20)
+    );
 
-    loadPosts();
-    return () => unsubscribe();
+    const unsubscribePosts = onSnapshot(q, 
+      { includeMetadataChanges: true }, // 메타데이터 변경도 감지하여 삭제 즉시 반영
+      (querySnapshot) => {
+        const postsData = [];
+        querySnapshot.forEach((doc) => {
+          // 삭제된 문서는 제외
+          if (doc.exists()) {
+            postsData.push({
+              id: doc.id,
+              ...doc.data()
+            });
+          }
+        });
+        setPosts(postsData);
+        setLoading(false);
+      }, 
+      (error) => {
+        console.error("게시글 실시간 구독 오류:", error);
+        // BloomFilter 오류는 무시 (기능에 영향 없음)
+        if (error.name !== 'BloomFilterError') {
+          setLoading(false);
+        }
+      }
+    );
+
+    return () => {
+      unsubscribe();
+      unsubscribePosts();
+    };
   }, []);
 
   const handleWriteClick = () => {
@@ -178,7 +175,7 @@ const Board = () => {
                             className="font-medium text-gray-800 hover:text-amber-600 cursor-pointer transition-colors"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleShowProfile(post.authorId, post.author);
+                              navigateToDM(post.authorId, user, navigate);
                             }}
                             title="프로필 보기"
                           >

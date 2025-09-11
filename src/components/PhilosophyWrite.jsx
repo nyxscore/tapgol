@@ -43,7 +43,7 @@ const PhilosophyWrite = () => {
       const postData = {
         title: title.trim(),
         content: content.trim(),
-        author: user.displayName || user.email,
+        author: user?.displayName || user?.email,
         authorId: user.uid
       };
       

@@ -24,15 +24,21 @@ const FeatureGrid = () => {
       path: '/health'
     },
     {
+      id: 11,
+      name: '오늘의 지혜',
+      icon: '⭐',
+      path: '/wisdom'
+    },
+    {
       id: 7,
-              name: '나만의요리',
+      name: '나만의요리',
       icon: '👨‍🍳',
       path: '/cooking'
     },
     {
       id: 8,
-      name: '노래자랑',
-      icon: '🎤',
+      name: '비디오',
+      icon: '🎬',
       path: '/karaoke'
     },
     {

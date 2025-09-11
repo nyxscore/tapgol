@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getUserProfile } from "../util/userService";
@@ -17,8 +18,10 @@ import ReportModal from './ReportModal';
 import UserProfileModal from './UserProfileModal';
 import { FaFlag } from 'react-icons/fa';
 import { isAdmin, formatAdminName, getAdminPostStyles, getEnhancedAdminStyles } from '../util/adminUtils';
+import { navigateToDM } from '../util/dmUtils';
 
 const CommentSection = ({ postId, postType = "board", boardType = "board" }) => {
+  const navigate = useNavigate();
   const [comments, setComments] = useState([]);
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
@@ -116,7 +119,7 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
       
       const commentData = {
         content: newComment.trim(),
-        author: userData?.nickname || userData?.name || user.displayName || "익명",
+        author: userData?.nickname || userData?.name || user?.displayName || "익명",
         authorId: user.uid,
         authorEmail: user.email
       };
@@ -232,7 +235,7 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
       
       const replyData = {
         content: newReply[commentId].trim(),
-        author: userData?.nickname || userData?.name || user.displayName || "익명",
+        author: userData?.nickname || userData?.name || user?.displayName || "익명",
         authorId: user.uid,
         authorEmail: user.email
       };
@@ -519,7 +522,7 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
                     <div className="flex items-center space-x-2">
                       <span 
                         className="cursor-pointer transition-colors"
-                        onClick={() => handleShowProfile(comment.authorId, comment.author)}
+                        onClick={() => navigateToDM(comment.authorId, user, navigate)}
                         title="프로필 보기"
                       >
                         {(() => {
@@ -691,7 +694,7 @@ const CommentSection = ({ postId, postType = "board", boardType = "board" }) => 
                                 <div className="flex items-center space-x-2">
                                   <span 
                                     className="text-sm cursor-pointer transition-colors"
-                                    onClick={() => handleShowProfile(reply.authorId, reply.author)}
+                                    onClick={() => navigateToDM(reply.authorId, user, navigate)}
                                     title="프로필 보기"
                                   >
                                     {(() => {

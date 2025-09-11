@@ -4,7 +4,6 @@ import { auth, db } from "./firebase";
 // 기존 데이터를 새로운 구조로 마이그레이션하는 함수
 const migrateUserData = (oldData) => {
   return {
-    userId: oldData.userId || oldData.id || "",
     name: oldData.name || "",
     nickname: oldData.nickname || "",
     phone: oldData.phone || "",
@@ -53,7 +52,6 @@ export const getUserProfile = async (userId) => {
     } else {
       // 사용자 데이터가 없으면 기본 구조로 생성
       const defaultData = {
-        userId: userId,
         name: "",
         nickname: "",
         phone: "",
@@ -312,7 +310,6 @@ export const getUserStats = async (userId) => {
       const daysSinceJoin = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
       
       return {
-        userId,
         joinDate: createdAt,
         daysSinceJoin,
         interests: userData.interests || [],

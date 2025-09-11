@@ -3,13 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getPost, incrementViews, deletePost, toggleLike } from "../util/postService";
-import { markNotificationsByPostIdAsRead } from "../util/notificationService";
 import { formatTextWithLinks } from "../util/textUtils.jsx";
 import CommentSection from "./CommentSection";
 import UserProfileModal from "./UserProfileModal";
+import { navigateToDM } from '../util/dmUtils';
 import ReportModal from "./ReportModal";
 import { FaFlag } from 'react-icons/fa';
-import { formatAdminName, isAdmin, getEnhancedAdminStyles } from '../util/adminUtils';
+import { formatAdminName, isAdmin, getEnhancedAdminStyles, isCurrentUserAdmin } from '../util/adminUtils';
 
 const BoardDetail = () => {
   const { id } = useParams();
@@ -41,16 +41,6 @@ const BoardDetail = () => {
         if (user) {
           await incrementViews(id);
           
-          // 이 게시글과 관련된 알림을 읽음 처리
-          try {
-            const processedCount = await markNotificationsByPostIdAsRead(id, "board");
-            if (processedCount > 0) {
-              console.log(`${processedCount}개의 게시글 관련 알림이 읽음 처리되었습니다.`);
-            }
-          } catch (notificationError) {
-            console.error("알림 읽음 처리 오류:", notificationError);
-            // 알림 처리 실패는 게시글 보기에 영향을 주지 않도록 함
-          }
         }
       } catch (error) {
         console.error("게시글 로드 오류:", error);
@@ -82,7 +72,7 @@ const BoardDetail = () => {
   };
 
   const handleDelete = async () => {
-    if (!user || user.uid !== post.authorId) {
+    if (!user || (user.uid !== post.authorId && !isCurrentUserAdmin(user))) {
       alert("삭제 권한이 없습니다.");
       return;
     }
@@ -105,7 +95,7 @@ const BoardDetail = () => {
   };
 
   const handleEdit = () => {
-    if (!user || user.uid !== post.authorId) {
+    if (!user || (user.uid !== post.authorId && !isCurrentUserAdmin(user))) {
       alert("수정 권한이 없습니다.");
       return;
     }
@@ -207,6 +197,7 @@ const BoardDetail = () => {
   }
 
   const isAuthor = user && user.uid === post.authorId;
+  const canEditDelete = isAuthor || isCurrentUserAdmin(user);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 pb-20">
@@ -263,7 +254,7 @@ const BoardDetail = () => {
                   }`}>
                     {post.category || "정기모임"}
                   </span>
-                  {isAuthor && (
+                  {canEditDelete && (
                     <div className="flex space-x-2">
                       <button
                         onClick={handleEdit}
@@ -299,7 +290,7 @@ const BoardDetail = () => {
                 <span className="text-gray-500 text-xs mb-1">작성자</span>
                 <span 
                   className="cursor-pointer transition-colors"
-                  onClick={() => handleShowProfile(post.authorId, post.author)}
+                  onClick={() => navigateToDM(post.authorId, user, navigate)}
                   title="프로필 보기"
                 >
                   {(() => {

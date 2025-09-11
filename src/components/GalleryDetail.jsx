@@ -3,13 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import { auth, db } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getGalleryItem, incrementViews, deleteGalleryItem, toggleLike, updateGalleryItem } from "../util/galleryService";
-import { markNotificationsByPostIdAsRead } from "../util/notificationService";
 import { formatTextWithLinks } from "../util/textUtils.jsx";
 import CommentSection from "./CommentSection";
 import UserProfileModal from "./UserProfileModal";
+import { navigateToDM } from '../util/dmUtils';
 import ReportModal from "./ReportModal";
 import { FaFlag } from 'react-icons/fa';
-import { formatAdminName, isAdmin, getEnhancedAdminStyles } from '../util/adminUtils';
+import { formatAdminName, isAdmin, getEnhancedAdminStyles, isCurrentUserAdmin } from '../util/adminUtils';
 
 const GalleryDetail = () => {
   const { id } = useParams();
@@ -38,19 +38,6 @@ const GalleryDetail = () => {
 
     return () => {
       unsubscribe();
-      // 컴포넌트 언마운트 시 비디오 정리
-      const videoElement = document.querySelector('video');
-      if (videoElement) {
-        try {
-          videoElement.pause();
-          videoElement.currentTime = 0;
-        } catch (error) {
-          // AbortError는 무시
-          if (error.name !== 'AbortError') {
-            console.error('비디오 정리 오류:', error);
-          }
-        }
-      }
     };
   }, []);
 
@@ -123,16 +110,6 @@ const GalleryDetail = () => {
         // 조회수 증가
         await incrementViews(id);
         
-        // 이 갤러리 항목과 관련된 알림을 읽음 처리
-        try {
-          const processedCount = await markNotificationsByPostIdAsRead(id, "gallery");
-          if (processedCount > 0) {
-            console.log(`${processedCount}개의 갤러리 관련 알림이 읽음 처리되었습니다.`);
-          }
-        } catch (notificationError) {
-          console.error("알림 읽음 처리 오류:", notificationError);
-          // 알림 처리 실패는 갤러리 보기에 영향을 주지 않도록 함
-        }
       } catch (error) {
         console.error("사용자 액션 처리 오류:", error);
         // 조회수 증가 실패는 갤러리 보기에 영향을 주지 않도록 함
@@ -158,7 +135,7 @@ const GalleryDetail = () => {
 
 
   const handleDelete = async () => {
-    if (!user || user.uid !== item.uploaderId) {
+    if (!user || (user.uid !== item.uploaderId && !isCurrentUserAdmin(user))) {
       alert("삭제 권한이 없습니다.");
       return;
     }
@@ -243,6 +220,12 @@ const GalleryDetail = () => {
       navigate("/login");
       return;
     }
+    
+    // 디버깅: 갤러리 아이템 데이터 확인
+    console.log("갤러리 신고 - 아이템 데이터:", item);
+    console.log("갤러리 신고 - uploaderId:", item?.uploaderId);
+    console.log("갤러리 신고 - uploader:", item?.uploader);
+    
     setShowReportModal(true);
   };
 
@@ -288,6 +271,7 @@ const GalleryDetail = () => {
 
   const isLiked = user && item?.likedBy?.includes(user.uid);
   const isAuthor = user && user.uid === item?.uploaderId;
+  const canEditDelete = isAuthor || isCurrentUserAdmin(user);
 
   if (loading) {
     return (
@@ -375,7 +359,7 @@ const GalleryDetail = () => {
               ) : (
                 <h2 className="text-2xl font-bold text-gray-800">{item.title}</h2>
               )}
-              {isAuthor && (
+              {canEditDelete && (
                 <div className="flex space-x-2">
                   {editing ? (
                     <>
@@ -425,7 +409,7 @@ const GalleryDetail = () => {
                 <span className="text-gray-500 text-xs mb-1">업로더</span>
                 <span 
                   className="cursor-pointer transition-colors"
-                  onClick={() => handleShowProfile(item.uploaderId, item.uploader)}
+                  onClick={() => navigateToDM(item.uploaderId, user, navigate)}
                   title="프로필 보기"
                 >
                   {(() => {
@@ -474,40 +458,15 @@ const GalleryDetail = () => {
 
           {/* 파일 표시 */}
           <div className="mb-8">
-            {item.fileTypeCategory === 'image' ? (
-              <div className="text-center">
-                <img
-                  src={item.fileUrl}
-                  alt={item.title}
-                  className="max-w-full h-auto rounded-lg shadow-lg mx-auto"
-                  style={{ maxHeight: '70vh' }}
-                  loading="lazy"
-                />
-              </div>
-            ) : (
-              <div className="text-center">
-                <video
-                  src={item.fileUrl}
-                  controls
-                  preload="metadata"
-                  poster=""
-                  className="max-w-full h-auto rounded-lg shadow-lg mx-auto"
-                  style={{ maxHeight: '70vh' }}
-                  onLoadedMetadata={(e) => {
-                    // 동영상 메타데이터 로드 후 첫 번째 프레임을 썸네일로 사용
-                    const video = e.target;
-                    const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    video.poster = canvas.toDataURL();
-                  }}
-                >
-                  브라우저가 비디오를 지원하지 않습니다.
-                </video>
-              </div>
-            )}
+            <div className="text-center">
+              <img
+                src={item.fileUrl}
+                alt={item.title}
+                className="max-w-full h-auto rounded-lg shadow-lg mx-auto"
+                style={{ maxHeight: '70vh' }}
+                loading="lazy"
+              />
+            </div>
           </div>
 
           {/* 설명 */}
@@ -566,7 +525,7 @@ const GalleryDetail = () => {
               </button>
               
               {/* 신고 버튼 - 작성자가 아닌 경우에만 표시 */}
-              {user && user.uid !== item.authorId && (
+              {user && user.uid !== item.uploaderId && (
                 <button
                   onClick={handleReport}
                   className="flex items-center space-x-2 px-4 py-3 rounded-lg transition-colors bg-purple-100 text-purple-700 hover:bg-purple-200 hover:text-purple-800"

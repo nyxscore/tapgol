@@ -72,7 +72,8 @@ export const createGalleryItem = async (galleryData) => {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       likes: 0,
-      views: 0
+      views: 0,
+      commentCount: 0
     };
     
     const docRef = await addDoc(collection(db, "gallery"), itemWithTimestamp);

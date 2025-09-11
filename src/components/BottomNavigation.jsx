@@ -3,17 +3,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { subscribeToUnreadChatCount, subscribeToUnreadCount } from "../util/notificationService";
+import { subscribeToUnreadMessages } from "../util/unreadMessagesService";
 
 const BottomNavigation = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState(null);
-  const [unreadChatCount, setUnreadChatCount] = useState(0);
-  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [unreadCounts, setUnreadCounts] = useState({});
   const unsubscribeRef = useRef(null);
-  const chatNotificationUnsubscribeRef = useRef(null);
-  const notificationUnsubscribeRef = useRef(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -23,41 +20,30 @@ const BottomNavigation = () => {
     return () => unsubscribe();
   }, []);
 
+  // 미확인 메시지 구독
   useEffect(() => {
-    // 로그인된 사용자만 읽지 않은 알림 개수 구독
-    if (user) {
-      try {
-        // 채팅 알림 구독
-        chatNotificationUnsubscribeRef.current = subscribeToUnreadChatCount((count) => {
-          setUnreadChatCount(count);
-        });
-        
-        // 일반 알림 구독
-        notificationUnsubscribeRef.current = subscribeToUnreadCount((count) => {
-          setUnreadNotificationCount(count);
-        });
-      } catch (error) {
-        console.error("알림 개수 구독 오류:", error);
-      }
-    } else {
-      // 로그아웃 시 알림 개수 초기화
-      setUnreadChatCount(0);
-      setUnreadNotificationCount(0);
-    }
+    if (!user) return;
 
-    return () => {
-      if (chatNotificationUnsubscribeRef.current) {
-        chatNotificationUnsubscribeRef.current();
-      }
-      if (notificationUnsubscribeRef.current) {
-        notificationUnsubscribeRef.current();
-      }
-    };
+    const unsubscribeUnread = subscribeToUnreadMessages(user.uid, (unreadData) => {
+      setUnreadCounts(unreadData);
+    });
+
+    return () => unsubscribeUnread();
   }, [user]);
+
+
+  // 미확인 메시지 개수 계산
+  const getTotalUnreadCount = () => {
+    let total = 0;
+    Object.values(unreadCounts).forEach(count => {
+      total += count;
+    });
+    return total;
+  };
 
   const navigationItems = [
     {
-      id: 0,
+      id: "home",
       name: "홈",
       path: "/",
       icon: (
@@ -67,30 +53,32 @@ const BottomNavigation = () => {
       ),
     },
     {
-      id: 1,
+      id: "chat",
       name: "탑골톡",
       path: "/chat/main",
+      badge: (unreadCounts.main && unreadCounts.main > 0) ? unreadCounts.main : null,
       icon: (
         <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
         </svg>
       ),
-      badge: user && unreadChatCount > 0 ? unreadChatCount : null
     },
     {
-      id: 2,
-      name: "알림",
-      path: "/alerts",
+      id: "dm",
+      name: "1:1 채팅",
+      path: "/chat/dm",
+      badge: (() => {
+        const dmCount = getTotalUnreadCount() - (unreadCounts.main || 0);
+        return dmCount > 0 ? dmCount : null;
+      })(),
       icon: (
         <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M10 2a6 6 0 00-6 6v2.586l-.707.707A1 1 0 004 13h12a1 1 0 00.707-1.707L16 10.586V8a6 6 0 00-6-6z" />
-          <path d="M14 14a4 4 0 11-8 0h8z" />
+          <path fillRule="evenodd" d="M18 5v8a2 2 0 01-2 2h-5l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2zM7 8H5v2h2V8zm2 0h2v2H9V8zm6 0h-2v2h2V8z" clipRule="evenodd" />
         </svg>
       ),
-      badge: user && unreadNotificationCount > 0 ? unreadNotificationCount : null
     },
     {
-      id: 3,
+      id: "profile",
       name: "프로필",
       path: "/profile",
       icon: (
@@ -109,7 +97,8 @@ const BottomNavigation = () => {
             key={item.id}
             onClick={() => navigate(item.path)}
             className={`flex flex-col items-center py-2 px-3 flex-1 relative ${
-              location.pathname === item.path
+              location.pathname === item.path || 
+              (item.path === "/chat/dm" && location.pathname.startsWith("/chat/dm/"))
                 ? "text-amber-600"
                 : "text-gray-500 hover:text-gray-700"
             } transition-colors`}
@@ -117,8 +106,10 @@ const BottomNavigation = () => {
             <div className="relative">
               {item.icon}
               {item.badge && (
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center min-w-[20px]">
-                  {item.badge > 99 ? '99+' : item.badge}
+                <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs rounded-full min-w-[20px] h-[20px] px-1 flex items-center justify-center font-bold shadow-lg border-2 border-white notification-badge">
+                  <span className="drop-shadow-sm">
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </span>
                 </span>
               )}
             </div>

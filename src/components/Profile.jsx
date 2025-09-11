@@ -550,12 +550,12 @@ const Profile = () => {
                       }}
                     />
                     <div className="w-full h-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-2xl font-bold" style={{ display: 'none' }}>
-                      {user.displayName ? user.displayName.charAt(0) : user.email?.charAt(0) || "U"}
+                      {user?.displayName ? user.displayName.charAt(0) : user?.email?.charAt(0) || "U"}
                     </div>
                   </>
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-2xl font-bold">
-                    {user.displayName ? user.displayName.charAt(0) : user.email?.charAt(0) || "U"}
+                    {user?.displayName ? user.displayName.charAt(0) : user?.email?.charAt(0) || "U"}
                   </div>
                 )}
               </div>
@@ -573,7 +573,7 @@ const Profile = () => {
             </div>
             <div>
               <h2 className="text-xl font-bold text-gray-800">
-                {user.displayName || "사용자"}
+                {user?.displayName || "사용자"}
               </h2>
               <p className="text-gray-600">{user.email}</p>
               <p className="text-sm text-gray-500">

@@ -6,7 +6,6 @@ import { auth, db } from "../util/firebase";
 
 const Signup = () => {
   const [form, setForm] = useState({
-    id: "",
     email: "",
     password: "",
     passwordConfirm: "",
@@ -76,15 +75,6 @@ const Signup = () => {
   const validateForm = () => {
     const errors = {};
 
-    // 아이디 검증
-    if (!form.id.trim()) {
-      errors.id = "아이디를 입력해주세요.";
-    } else if (form.id.length < 3) {
-      errors.id = "아이디는 3자 이상이어야 합니다.";
-    } else if (!/^[a-zA-Z0-9가-힣]+$/.test(form.id)) {
-      errors.id = "아이디는 영문, 숫자, 한글만 사용 가능합니다.";
-    }
-
     // 이메일 검증
     if (!form.email.trim()) {
       errors.email = "이메일을 입력해주세요.";
@@ -111,24 +101,20 @@ const Signup = () => {
       errors.passwordConfirm = "비밀번호가 일치하지 않습니다.";
     }
 
-    // 이름 검증
-    if (!form.name.trim()) {
-      errors.name = "이름을 입력해주세요.";
-    } else if (form.name.length < 2) {
+    // 이름 검증 (선택사항)
+    if (form.name.trim() && form.name.length < 2) {
       errors.name = "이름은 2자 이상이어야 합니다.";
     }
 
-    // 별명 검증
+    // 별명 검증 (필수)
     if (!form.nickname.trim()) {
       errors.nickname = "별명을 입력해주세요.";
     } else if (form.nickname.length < 2) {
       errors.nickname = "별명은 2자 이상이어야 합니다.";
     }
 
-    // 전화번호 검증
-    if (!form.phone.trim()) {
-      errors.phone = "전화번호를 입력해주세요.";
-    } else {
+    // 전화번호 검증 (선택사항)
+    if (form.phone.trim()) {
       const phoneRegex = /^[0-9]{2,3}-?[0-9]{3,4}-?[0-9]{4}$/;
       if (!phoneRegex.test(form.phone)) {
         errors.phone = "전화번호 형식이 올바르지 않습니다. (예: 010-1234-5678)";
@@ -160,21 +146,20 @@ const Signup = () => {
 
       // 사용자 프로필 업데이트
       await updateProfile(userCredential.user, {
-        displayName: form.name,
+        displayName: form.name || form.nickname || form.email.split('@')[0],
         photoURL: null
       });
 
       // Firestore에 상세 사용자 정보 저장
       const userData = {
-        userId: form.id,
-        name: form.name,
+        name: form.name || null,
         nickname: form.nickname,
-        phone: form.phone,
+        phone: form.phone || null,
         email: form.email,
         birthDate: form.birthDate || null,
         gender: form.gender || null,
         address: form.address || null,
-        interests: form.interests,
+        interests: form.interests || [],
         profileImage: form.profileImage ? form.profileImage.name : null,
         isActive: true,
         role: "user",
@@ -184,7 +169,7 @@ const Signup = () => {
         // 추가 메타데이터
         signupMethod: "email",
         emailVerified: false,
-        profileComplete: true
+        profileComplete: true // 기본정보(이메일, 별명, 비밀번호)가 모두 필수이므로 항상 완성된 상태
       };
 
       await setDoc(doc(db, "users", userCredential.user.uid), userData);
@@ -204,7 +189,7 @@ const Signup = () => {
       
       switch (error.code) {
         case "auth/email-already-in-use":
-          errorMessage = "이미 사용 중인 아이디입니다. 다른 아이디를 선택해주세요.";
+          errorMessage = "이미 사용 중인 이메일입니다. 다른 이메일을 선택해주세요.";
           errorType = "warning";
           break;
         case "auth/weak-password":
@@ -212,7 +197,7 @@ const Signup = () => {
           errorType = "error";
           break;
         case "auth/invalid-email":
-          errorMessage = "유효하지 않은 이메일 형식입니다. 아이디 형식을 확인해주세요.";
+          errorMessage = "유효하지 않은 이메일 형식입니다. 이메일 형식을 확인해주세요.";
           errorType = "error";
           break;
         case "auth/operation-not-allowed":
@@ -288,40 +273,21 @@ const Signup = () => {
         <div className="bg-gray-50 p-6 rounded-lg">
           <h3 className="text-xl font-semibold text-gray-800 mb-4">기본 정보</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-lg font-semibold mb-2" htmlFor="id">
-                아이디 *
-              </label>
-              <input
-                type="text"
-                id="id"
-                name="id"
-                value={form.id}
-                onChange={handleChange}
-                className={`w-full border rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-amber-400 ${getFieldErrorStyle("id")}`}
-                required
-                placeholder="아이디를 입력하세요"
-              />
-              {fieldErrors.id && <p className="text-sm text-red-500 mt-1">{fieldErrors.id}</p>}
-            </div>
-            
-            <div>
-              <label className="block text-lg font-semibold mb-2" htmlFor="email">
-                이메일 *
-              </label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                value={form.email}
-                onChange={handleChange}
-                className={`w-full border rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-amber-400 ${getFieldErrorStyle("email")}`}
-                required
-                placeholder="example@gmail.com"
-              />
-              {fieldErrors.email && <p className="text-sm text-red-500 mt-1">{fieldErrors.email}</p>}
-            </div>
+          <div>
+            <label className="block text-lg font-semibold mb-2" htmlFor="email">
+              이메일 *
+            </label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              value={form.email}
+              onChange={handleChange}
+              className={`w-full border rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-amber-400 ${getFieldErrorStyle("email")}`}
+              required
+              placeholder="example@gmail.com"
+            />
+            {fieldErrors.email && <p className="text-sm text-red-500 mt-1">{fieldErrors.email}</p>}
           </div>
 
           <div className="mt-4">
@@ -382,12 +348,12 @@ const Signup = () => {
 
         {/* 개인 정보 섹션 */}
         <div className="bg-gray-50 p-6 rounded-lg">
-          <h3 className="text-xl font-semibold text-gray-800 mb-4">개인 정보</h3>
+          <h3 className="text-xl font-semibold text-gray-800 mb-4">개인 정보 (선택사항)</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-lg font-semibold mb-2" htmlFor="name">
-                이름 *
+                이름
               </label>
               <input
                 type="text"
@@ -396,15 +362,14 @@ const Signup = () => {
                 value={form.name}
                 onChange={handleChange}
                 className={`w-full border rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-amber-400 ${getFieldErrorStyle("name")}`}
-                required
-                placeholder="홍길동"
+                placeholder="홍길동 (선택사항)"
               />
               {fieldErrors.name && <p className="text-sm text-red-500 mt-1">{fieldErrors.name}</p>}
             </div>
             
             <div>
               <label className="block text-lg font-semibold mb-2" htmlFor="phone">
-                전화번호 *
+                전화번호
               </label>
               <input
                 type="tel"
@@ -413,8 +378,7 @@ const Signup = () => {
                 value={form.phone}
                 onChange={handleChange}
                 className={`w-full border rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-amber-400 ${getFieldErrorStyle("phone")}`}
-                required
-                placeholder="01012345678 또는 010-1234-5678"
+                placeholder="010-1234-5678 (선택사항)"
                 maxLength="13"
               />
               {fieldErrors.phone && <p className="text-sm text-red-500 mt-1">{fieldErrors.phone}</p>}
@@ -466,43 +430,43 @@ const Signup = () => {
               value={form.address}
               onChange={handleChange}
               className="w-full border border-amber-300 rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-amber-400"
-              placeholder="서울시 종로구 탑골공원"
+              placeholder="서울시 종로구 탑골공원 (선택사항)"
             />
           </div>
-        </div>
 
-        {/* 관심사 섹션 */}
-        <div className="bg-gray-50 p-6 rounded-lg">
-          <h3 className="text-xl font-semibold text-gray-800 mb-4">관심사 (선택)</h3>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {interests.map((interest) => (
-              <label key={interest} className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="interests"
-                  value={interest}
-                  checked={form.interests.includes(interest)}
-                  onChange={handleChange}
-                  className="w-4 h-4 text-amber-600 border-amber-300 rounded focus:ring-amber-500"
-                />
-                <span className="text-sm">{interest}</span>
-              </label>
-            ))}
+          {/* 관심사 */}
+          <div className="mt-6">
+            <h4 className="text-lg font-semibold text-gray-800 mb-3">관심사</h4>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {interests.map((interest) => (
+                <label key={interest} className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="interests"
+                    value={interest}
+                    checked={form.interests.includes(interest)}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-amber-600 border-amber-300 rounded focus:ring-amber-500"
+                  />
+                  <span className="text-sm">{interest}</span>
+                </label>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* 프로필 이미지 섹션 */}
-        <div className="bg-gray-50 p-6 rounded-lg">
-          <h3 className="text-xl font-semibold text-gray-800 mb-4">프로필 이미지 (선택)</h3>
-          <input
-            type="file"
-            id="profileImage"
-            name="profileImage"
-            accept="image/*"
-            onChange={handleChange}
-            className="w-full border border-amber-300 rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-amber-400"
-          />
-          <p className="text-sm text-gray-600 mt-2">JPG, PNG, GIF 파일만 업로드 가능합니다.</p>
+          {/* 프로필 이미지 */}
+          <div className="mt-6">
+            <h4 className="text-lg font-semibold text-gray-800 mb-3">프로필 이미지</h4>
+            <input
+              type="file"
+              id="profileImage"
+              name="profileImage"
+              accept="image/*"
+              onChange={handleChange}
+              className="w-full border border-amber-300 rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+            <p className="text-sm text-gray-600 mt-2">JPG, PNG, GIF 파일만 업로드 가능합니다. (선택사항)</p>
+          </div>
         </div>
 
         <button

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { auth } from "../util/firebase";
+import { auth, db } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { getGalleryItems, toggleLike, incrementViews } from "../util/galleryService";
 import UserProfileModal from './UserProfileModal';
+import { navigateToDM } from '../util/dmUtils';
 
 const Gallery = () => {
   const navigate = useNavigate();
@@ -20,8 +22,41 @@ const Gallery = () => {
       setUser(currentUser);
     });
 
-    loadGalleryItems();
-    return () => unsubscribe();
+    // 실시간 갤러리 구독 (최적화된 쿼리)
+    const q = query(
+      collection(db, "gallery"),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribeGallery = onSnapshot(q, 
+      { includeMetadataChanges: true }, // 메타데이터 변경도 감지하여 삭제 즉시 반영
+      (querySnapshot) => {
+        const galleryData = [];
+        querySnapshot.forEach((doc) => {
+          // 삭제된 문서는 제외
+          if (doc.exists()) {
+            galleryData.push({
+              id: doc.id,
+              ...doc.data()
+            });
+          }
+        });
+        setItems(galleryData);
+        setLoading(false);
+      }, 
+      (error) => {
+        console.error("갤러리 실시간 구독 오류:", error);
+        // BloomFilter 오류는 무시 (기능에 영향 없음)
+        if (error.name !== 'BloomFilterError') {
+          setLoading(false);
+        }
+      }
+    );
+
+    return () => {
+      unsubscribe();
+      unsubscribeGallery();
+    };
   }, []);
 
   const loadGalleryItems = async () => {
@@ -121,12 +156,6 @@ const Gallery = () => {
           <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
         </svg>
       );
-    } else if (fileType === 'video') {
-      return (
-        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-        </svg>
-      );
     }
     return null;
   };
@@ -189,49 +218,12 @@ const Gallery = () => {
                   className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transform transition-transform hover:scale-105 hover:shadow-lg"
                 >
                   <div className="relative">
-                    {item.fileTypeCategory === 'image' ? (
-                      <img
-                        src={item.fileUrl}
-                        alt={item.title}
-                        className="w-full h-48 object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-48 bg-gray-200 flex items-center justify-center relative overflow-hidden">
-                        <video
-                          src={item.fileUrl}
-                          className="w-full h-full object-cover"
-                          muted
-                          preload="metadata"
-                          poster=""
-                          onLoadedMetadata={(e) => {
-                            // 동영상 메타데이터 로드 후 첫 번째 프레임을 썸네일로 사용
-                            const video = e.target;
-                            const canvas = document.createElement('canvas');
-                            canvas.width = video.videoWidth;
-                            canvas.height = video.videoHeight;
-                            const ctx = canvas.getContext('2d');
-                            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                            video.style.backgroundImage = `url(${canvas.toDataURL()})`;
-                            video.style.backgroundSize = 'cover';
-                            video.style.backgroundPosition = 'center';
-                          }}
-                        />
-                        <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
-                          <div className="bg-white bg-opacity-20 rounded-full p-3 backdrop-blur-sm">
-                            <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                        </div>
-                        <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded flex items-center space-x-1">
-                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                          </svg>
-                          <span>동영상</span>
-                        </div>
-                      </div>
-                    )}
+                    <img
+                      src={item.fileUrl}
+                      alt={item.title}
+                      className="w-full h-48 object-cover"
+                      loading="lazy"
+                    />
                     <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded flex items-center space-x-1">
                       {getFileTypeIcon(item.fileTypeCategory)}
                       <span>{formatDate(item.createdAt)}</span>
@@ -253,7 +245,7 @@ const Gallery = () => {
                           className="font-medium text-gray-800 hover:text-amber-600 cursor-pointer transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleShowProfile(item.uploaderId, item.uploader);
+                            navigateToDM(item.uploaderId, user, navigate);
                           }}
                           title="프로필 보기"
                         >

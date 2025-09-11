@@ -16,69 +16,48 @@ const validateUserAuth = async () => {
   }
 };
 
-// 관리자 권한 확인 함수
+// 관리자 권한 확인 함수 (간소화된 버전)
 export const checkAdminRole = async (userId) => {
+  console.log("🔍 관리자 권한 확인 시작:", userId);
+  
   try {
     // 현재 로그인한 사용자의 이메일 확인
     const currentUser = auth.currentUser;
     if (!currentUser) {
+      console.log("❌ 로그인된 사용자가 없습니다.");
       return false;
     }
     
     const userEmail = currentUser.email;
-    console.log("관리자 권한 확인 중:", { userId, userEmail });
+    console.log("📧 사용자 이메일:", userEmail);
     
-    // 지정된 관리자 이메일 확인
+    // 지정된 관리자 이메일 확인 (가장 우선순위)
     if (userEmail === "juhyundon82@gmail.com") {
-      console.log("관리자 이메일로 권한 부여:", userEmail);
-      
-      // 관리자 정보를 Firestore에 자동 저장
-      try {
-        await setDoc(doc(db, "users", userId), {
-          uid: userId,
-          email: userEmail,
-          role: "admin",
-          isAdmin: true,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-        
-        // admins 컬렉션에도 추가
-        await setDoc(doc(db, "admins", userId), {
-          uid: userId,
-          email: userEmail,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-        
-        console.log("관리자 정보가 Firestore에 저장되었습니다.");
-      } catch (error) {
-        console.error("관리자 정보 저장 오류:", error);
-      }
-      
+      console.log("✅ 관리자 이메일로 권한 부여:", userEmail);
       return true;
     }
     
-    // Firestore users 컬렉션에서 관리자 권한 확인
+    console.log("🔍 Firestore에서 관리자 권한 확인 중...");
+    
+    // Firestore에서 관리자 권한 확인
     const userDoc = await getDoc(doc(db, "users", userId));
-    const userData = userDoc.data();
+    console.log("📄 사용자 문서 존재:", userDoc.exists());
     
-    if (userData?.role === "admin") {
-      console.log("관리자 권한 확인됨:", userData);
-      return true;
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      console.log("👤 사용자 데이터:", userData);
+      
+      if (userData.isAdmin === true || userData.role === "admin") {
+        console.log("✅ Firestore에서 관리자 권한 확인:", userData);
+        return true;
+      }
     }
     
-    // Firebase Console에서 직접 설정한 관리자 계정인지 확인
-    const adminDoc = await getDoc(doc(db, "admins", userId));
-    if (adminDoc.exists()) {
-      console.log("관리자 권한 확인됨 (admins 컬렉션)");
-      return true;
-    }
-    
-    console.log("관리자 권한 없음");
+    console.log("❌ 관리자 권한 없음 - 일반 사용자");
     return false;
+    
   } catch (error) {
-    console.error("관리자 권한 확인 오류:", error);
+    console.error("❌ 관리자 권한 확인 오류:", error);
     return false;
   }
 };
@@ -107,14 +86,24 @@ export const reportChatMessage = async (messageData, reason, description) => {
       throw new Error("올바른 신고 사유를 선택해주세요.");
     }
     
+    // 필수 필드 유효성 검사
+    console.log("채팅 메시지 신고 - 전달받은 데이터:", messageData);
+    console.log("채팅 메시지 신고 - authorId:", messageData.authorId);
+    console.log("채팅 메시지 신고 - author:", messageData.author);
+    
+    if (!messageData.authorId) {
+      console.error("메시지 데이터:", messageData);
+      throw new Error("메시지 작성자 정보가 없습니다.");
+    }
+    
     const reportData = {
       reporterId: currentUser.uid,
       reporterName: currentUser.displayName || "익명",
       reportedUserId: messageData.authorId,
-      reportedUserName: messageData.author,
+      reportedUserName: messageData.author || "익명",
       messageId: messageData.id,
-      messageContent: messageData.content,
-      messageTimestamp: messageData.createdAt,
+      messageContent: messageData.content || "",
+      messageTimestamp: messageData.createdAt || serverTimestamp(),
       reason: reason,
       description: description || "",
       status: "pending", // pending, reviewed, resolved, dismissed
@@ -147,21 +136,67 @@ export const reportPost = async (postData, reason, description) => {
       throw new Error("올바른 신고 사유를 선택해주세요.");
     }
     
+    // 필수 필드 유효성 검사
+    console.log("게시글 신고 - 전달받은 데이터:", postData);
+    console.log("게시글 신고 - authorId:", postData.authorId);
+    console.log("게시글 신고 - author:", postData.author);
+    console.log("게시글 신고 - userId:", postData.userId);
+    console.log("게시글 신고 - uploader:", postData.uploader);
+    
+    // 다양한 필드명으로 작성자 정보 찾기
+    const authorId = postData.authorId || postData.userId || postData.uploaderId || postData.uploader?.id;
+    const authorName = postData.author || postData.uploader || postData.uploaderName || postData.userName || postData.nickname;
+    
+    console.log("게시글 신고 - 추출된 authorId:", authorId);
+    console.log("게시글 신고 - 추출된 authorName:", authorName);
+    
+    if (!authorId) {
+      console.error("게시글 데이터:", postData);
+      console.log("작성자 정보가 없는 경우 - 시스템 관리자로 처리");
+      
+      // 작성자 정보가 없는 경우 시스템 관리자로 처리
+      const systemAdminId = "system-admin";
+      const systemAdminName = "시스템 관리자";
+      
+      const reportData = {
+        reporterId: currentUser.uid,
+        reporterName: currentUser.displayName || "익명",
+        reportedUserId: systemAdminId,
+        reportedUserName: systemAdminName,
+        postId: postData.id,
+        postTitle: postData.title || postData.originalName || postData.description || "제목 없음",
+        postContent: postData.content || postData.description || "",
+        postTimestamp: postData.createdAt || postData.uploadedAt || serverTimestamp(),
+        reason: reason,
+        description: description || "",
+        status: "pending",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        postType: postData.boardType || postData.type || "general",
+        note: "작성자 정보가 없는 게시글 신고"
+      };
+      
+      const reportRef = await addDoc(collection(db, "reports"), reportData);
+      console.log("게시글 신고가 성공적으로 접수되었습니다 (시스템 관리자로 처리):", reportRef.id);
+      
+      return reportRef.id;
+    }
+    
     const reportData = {
       reporterId: currentUser.uid,
       reporterName: currentUser.displayName || "익명",
-      reportedUserId: postData.authorId,
-      reportedUserName: postData.author,
+      reportedUserId: authorId,
+      reportedUserName: authorName || "익명",
       postId: postData.id,
-      postTitle: postData.title,
-      postContent: postData.content,
-      postTimestamp: postData.createdAt,
+      postTitle: postData.title || postData.originalName || postData.description || "제목 없음",
+      postContent: postData.content || postData.description || "",
+      postTimestamp: postData.createdAt || postData.uploadedAt || serverTimestamp(),
       reason: reason,
       description: description || "",
       status: "pending",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      postType: postData.boardType || "general" // general, health, marketplace, gallery, karaoke
+      postType: postData.boardType || postData.type || "general" // general, health, marketplace, gallery, karaoke
     };
     
     const reportRef = await addDoc(collection(db, "reports"), reportData);
@@ -187,6 +222,16 @@ export const reportComment = async (commentData, reason, description) => {
       throw new Error("올바른 신고 사유를 선택해주세요.");
     }
     
+    // 필수 필드 유효성 검사
+    console.log("댓글 신고 - 전달받은 데이터:", commentData);
+    console.log("댓글 신고 - authorId:", commentData.authorId);
+    console.log("댓글 신고 - author:", commentData.author);
+    
+    if (!commentData.authorId) {
+      console.error("댓글 데이터:", commentData);
+      throw new Error("댓글 작성자 정보가 없습니다.");
+    }
+    
     // 댓글인지 대댓글인지 구분
     const isReply = commentData.type === "reply";
     const contentType = isReply ? "대댓글" : "댓글";
@@ -195,10 +240,10 @@ export const reportComment = async (commentData, reason, description) => {
       reporterId: currentUser.uid,
       reporterName: currentUser.displayName || "익명",
       reportedUserId: commentData.authorId,
-      reportedUserName: commentData.author,
+      reportedUserName: commentData.author || "익명",
       commentId: commentData.id,
-      commentContent: commentData.content,
-      commentTimestamp: commentData.createdAt,
+      commentContent: commentData.content || "",
+      commentTimestamp: commentData.createdAt || serverTimestamp(),
       reason: reason,
       description: description || "",
       status: "pending",
@@ -230,6 +275,17 @@ export const reportUser = async (userData, reason, description) => {
     
     if (!reason || !REPORT_REASONS.includes(reason)) {
       throw new Error("올바른 신고 사유를 선택해주세요.");
+    }
+    
+    // 필수 필드 유효성 검사
+    console.log("사용자 신고 - 전달받은 데이터:", userData);
+    console.log("사용자 신고 - id:", userData.id);
+    console.log("사용자 신고 - displayName:", userData.displayName);
+    console.log("사용자 신고 - nickname:", userData.nickname);
+    
+    if (!userData.id) {
+      console.error("사용자 데이터:", userData);
+      throw new Error("사용자 ID 정보가 없습니다.");
     }
     
     // 자기 자신을 신고하는 것을 방지
@@ -292,18 +348,75 @@ export const getMyReports = async (limitCount = 20) => {
   }
 };
 
+// 관리자용 신고 데이터 삭제
+export const adminDeleteReport = async (reportId) => {
+  try {
+    const currentUser = await validateUserAuth();
+    
+    // 간단한 관리자 권한 확인 (이메일 기반)
+    const isAdminEmail = currentUser.email === "juhyundon82@gmail.com";
+    
+    let isAdmin = isAdminEmail;
+    
+    // 이메일이 관리자가 아니면 Firestore에서 확인
+    if (!isAdminEmail) {
+      try {
+        isAdmin = await checkAdminRole(currentUser.uid);
+      } catch (error) {
+        console.log("⚠️ 관리자 권한 확인 실패:", error.message);
+        isAdmin = false;
+      }
+    }
+    
+    if (!isAdmin) {
+      throw new Error("관리자 권한이 필요합니다.");
+    }
+    
+    console.log(`🗑️ 신고 데이터 삭제 시도: reports/${reportId}`);
+    
+    // 신고 데이터 삭제
+    await deleteDoc(doc(db, "reports", reportId));
+    console.log(`✅ 신고 데이터 삭제 완료: reports/${reportId}`);
+    
+    return true;
+  } catch (error) {
+    console.error("신고 데이터 삭제 오류:", error);
+    console.error("오류 상세 정보:", {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    throw new Error(`신고 데이터 삭제 실패: ${error.message || '알 수 없는 오류'}`);
+  }
+};
+
 // 신고 상태 업데이트 (관리자용)
 export const updateReportStatus = async (reportId, status, adminNote = "") => {
   try {
     const currentUser = await validateUserAuth();
     
-    // 관리자 권한 확인 (간단한 체크)
-    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-    const userData = userDoc.data();
+    // 간단한 관리자 권한 확인 (이메일 기반)
+    const isAdminEmail = currentUser.email === "juhyundon82@gmail.com";
     
-    if (!userData || userData.role !== "admin") {
+    let isAdmin = isAdminEmail;
+    
+    // 이메일이 관리자가 아니면 Firestore에서 확인
+    if (!isAdminEmail) {
+      try {
+        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        const userData = userDoc.data();
+        isAdmin = userData && (userData.role === "admin" || userData.isAdmin === true);
+      } catch (error) {
+        console.log("⚠️ 관리자 권한 확인 실패:", error.message);
+        isAdmin = false;
+      }
+    }
+    
+    if (!isAdmin) {
       throw new Error("관리자 권한이 필요합니다.");
     }
+    
+    console.log(`📝 신고 상태 업데이트: ${reportId} → ${status}`);
     
     const reportRef = doc(db, "reports", reportId);
     await updateDoc(reportRef, {
@@ -314,10 +427,17 @@ export const updateReportStatus = async (reportId, status, adminNote = "") => {
       reviewedAt: serverTimestamp()
     });
     
+    console.log(`✅ 신고 상태 업데이트 완료: ${reportId}`);
+    
     return true;
   } catch (error) {
     console.error("신고 상태 업데이트 오류:", error);
-    throw error;
+    console.error("오류 상세 정보:", {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    throw new Error(`신고 상태 업데이트 실패: ${error.message || '알 수 없는 오류'}`);
   }
 };
 
@@ -376,38 +496,74 @@ export const adminDeleteComment = async (commentId, commentType = "comment") => 
   try {
     const currentUser = await validateUserAuth();
     
-    // 관리자 권한 확인
-    const isAdmin = await checkAdminRole(currentUser.uid);
+    // 간단한 관리자 권한 확인 (이메일 기반)
+    const isAdminEmail = currentUser.email === "juhyundon82@gmail.com";
+    
+    let isAdmin = isAdminEmail;
+    
+    // 이메일이 관리자가 아니면 Firestore에서 확인
+    if (!isAdminEmail) {
+      try {
+        isAdmin = await checkAdminRole(currentUser.uid);
+      } catch (error) {
+        console.log("⚠️ 관리자 권한 확인 실패:", error.message);
+        isAdmin = false;
+      }
+    }
+    
     if (!isAdmin) {
       throw new Error("관리자 권한이 필요합니다.");
     }
     
+    console.log(`🗑️ 댓글 삭제 시도: ${commentType} - ${commentId}`);
+    
     // 댓글/대댓글 삭제
     if (commentType === "reply") {
       // 대댓글 삭제
+      console.log(`🗑️ Firestore에서 대댓글 삭제 시도: replies/${commentId}`);
       await deleteDoc(doc(db, "replies", commentId));
-      console.log(`관리자가 대댓글 ${commentId}를 삭제했습니다.`);
+      console.log(`✅ Firestore 대댓글 삭제 완료: replies/${commentId}`);
     } else {
       // 댓글 삭제 (대댓글도 함께 삭제)
+      console.log(`🗑️ Firestore에서 댓글 삭제 시도: comments/${commentId}`);
       await deleteDoc(doc(db, "comments", commentId));
+      console.log(`✅ Firestore 댓글 삭제 완료: comments/${commentId}`);
       
       // 해당 댓글의 대댓글들도 삭제
-      const repliesQuery = query(
-        collection(db, "replies"),
-        where("parentCommentId", "==", commentId)
-      );
-      const repliesSnapshot = await getDocs(repliesQuery);
-      
-      const deletePromises = repliesSnapshot.docs.map(doc => deleteDoc(doc.ref));
-      await Promise.all(deletePromises);
-      
-      console.log(`관리자가 댓글 ${commentId}와 관련 대댓글들을 삭제했습니다.`);
+      try {
+        console.log(`🔍 관련 대댓글 검색 중: parentCommentId=${commentId}`);
+        const repliesQuery = query(
+          collection(db, "replies"),
+          where("parentCommentId", "==", commentId)
+        );
+        const repliesSnapshot = await getDocs(repliesQuery);
+        
+        console.log(`📝 발견된 대댓글 수: ${repliesSnapshot.docs.length}개`);
+        
+        if (repliesSnapshot.docs.length > 0) {
+          const deletePromises = repliesSnapshot.docs.map(doc => {
+            console.log(`🗑️ 대댓글 삭제 시도: ${doc.id}`);
+            return deleteDoc(doc.ref);
+          });
+          await Promise.all(deletePromises);
+          console.log(`✅ 관련 대댓글 ${repliesSnapshot.docs.length}개 삭제 완료`);
+        } else {
+          console.log(`ℹ️ 삭제할 대댓글이 없습니다.`);
+        }
+      } catch (replyError) {
+        console.log("⚠️ 대댓글 삭제 실패 (무시):", replyError.message);
+      }
     }
     
     return true;
   } catch (error) {
     console.error("관리자 댓글 삭제 오류:", error);
-    throw error;
+    console.error("오류 상세 정보:", {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    throw new Error(`댓글 삭제 실패: ${error.message || '알 수 없는 오류'}`);
   }
 };
 
@@ -416,8 +572,21 @@ export const adminDeletePost = async (postId, postType) => {
   try {
     const currentUser = await validateUserAuth();
     
-    // 관리자 권한 확인
-    const isAdmin = await checkAdminRole(currentUser.uid);
+    // 간단한 관리자 권한 확인 (이메일 기반)
+    const isAdminEmail = currentUser.email === "juhyundon82@gmail.com";
+    
+    let isAdmin = isAdminEmail;
+    
+    // 이메일이 관리자가 아니면 Firestore에서 확인
+    if (!isAdminEmail) {
+      try {
+        isAdmin = await checkAdminRole(currentUser.uid);
+      } catch (error) {
+        console.log("⚠️ 관리자 권한 확인 실패:", error.message);
+        isAdmin = false;
+      }
+    }
+    
     if (!isAdmin) {
       throw new Error("관리자 권한이 필요합니다.");
     }
@@ -432,10 +601,10 @@ export const adminDeletePost = async (postId, postType) => {
         collectionName = "healthPosts";
         break;
       case "marketplace":
-        collectionName = "marketplacePosts";
+        collectionName = "marketplace";
         break;
       case "gallery":
-        collectionName = "galleryItems";
+        collectionName = "gallery";
         break;
       case "karaoke":
         collectionName = "karaokePosts";
@@ -443,28 +612,67 @@ export const adminDeletePost = async (postId, postType) => {
       case "cooking":
         collectionName = "cookingPosts";
         break;
+      case "chat":
+        collectionName = "chatMessages";
+        break;
+      case "parkChat":
+        collectionName = "parkChats";
+        break;
       default:
         collectionName = "posts";
     }
     
+    console.log(`🗑️ 게시글 삭제 시도:`, {
+      postType: postType,
+      collectionName: collectionName,
+      postId: postId,
+      currentUser: currentUser.email
+    });
+    
     // 게시글 삭제
+    console.log(`🗑️ Firestore에서 삭제 시도: ${collectionName}/${postId}`);
     await deleteDoc(doc(db, collectionName, postId));
+    console.log(`✅ Firestore 게시글 삭제 완료: ${collectionName}/${postId}`);
     
-    // 관련 댓글들도 삭제
-    const commentsQuery = query(
-      collection(db, "comments"),
-      where("postId", "==", postId)
-    );
-    const commentsSnapshot = await getDocs(commentsQuery);
-    
-    const deletePromises = commentsSnapshot.docs.map(doc => deleteDoc(doc.ref));
-    await Promise.all(deletePromises);
+    // 관련 댓글들도 삭제 (채팅 메시지는 댓글이 없으므로 건너뛰기)
+    if (postType !== "chat" && postType !== "parkChat") {
+      try {
+        console.log(`🔍 관련 댓글 검색 중: postId=${postId}`);
+        const commentsQuery = query(
+          collection(db, "comments"),
+          where("postId", "==", postId)
+        );
+        const commentsSnapshot = await getDocs(commentsQuery);
+        
+        console.log(`📝 발견된 댓글 수: ${commentsSnapshot.docs.length}개`);
+        
+        if (commentsSnapshot.docs.length > 0) {
+          const deletePromises = commentsSnapshot.docs.map(doc => {
+            console.log(`🗑️ 댓글 삭제 시도: ${doc.id}`);
+            return deleteDoc(doc.ref);
+          });
+          await Promise.all(deletePromises);
+          console.log(`✅ 관련 댓글 ${commentsSnapshot.docs.length}개 삭제 완료`);
+        } else {
+          console.log(`ℹ️ 삭제할 댓글이 없습니다.`);
+        }
+      } catch (commentError) {
+        console.log("⚠️ 댓글 삭제 실패 (무시):", commentError.message);
+      }
+    } else {
+      console.log(`ℹ️ 채팅 메시지는 댓글이 없으므로 댓글 삭제를 건너뜁니다.`);
+    }
     
     console.log(`관리자가 ${postType} 게시글 ${postId}와 관련 댓글들을 삭제했습니다.`);
     
     return true;
   } catch (error) {
     console.error("관리자 게시글 삭제 오류:", error);
-    throw error;
+    console.error("오류 상세 정보:", {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    throw new Error(`게시글 삭제 실패: ${error.message || '알 수 없는 오류'}`);
   }
 };

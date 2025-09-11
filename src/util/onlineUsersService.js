@@ -32,6 +32,13 @@ export const addOnlineUser = async (userData) => {
     return { id: docRef.id, ...onlineUserData };
   } catch (error) {
     console.error("접속자 추가 오류:", error);
+    
+    // 권한 오류인 경우 로컬 상태로 처리
+    if (error.code === 'permission-denied' || error.message.includes('permissions')) {
+      console.log("권한 오류 - 로컬 접속자 상태 처리");
+      return { id: `local-${userData.authorId}`, ...userData, isOnline: true };
+    }
+    
     throw new Error("접속자 등록에 실패했습니다.");
   }
 };
@@ -61,6 +68,13 @@ export const updateOnlineUser = async (userId, updateData) => {
     }
   } catch (error) {
     console.error("접속자 업데이트 오류:", error);
+    
+    // 권한 오류인 경우 무시
+    if (error.code === 'permission-denied' || error.message.includes('permissions')) {
+      console.log("권한 오류 - 접속자 업데이트 건너뜀");
+      return;
+    }
+    
     throw new Error("접속자 정보 업데이트에 실패했습니다.");
   }
 };
@@ -85,6 +99,12 @@ export const updateUserActivity = async (userId) => {
     }
   } catch (error) {
     console.error("사용자 활동 업데이트 오류:", error);
+    
+    // 권한 오류인 경우 무시
+    if (error.code === 'permission-denied' || error.message.includes('permissions')) {
+      console.log("권한 오류 - 사용자 활동 업데이트 건너뜀");
+      return;
+    }
   }
 };
 
@@ -95,6 +115,13 @@ export const removeOnlineUser = async (userId) => {
     await deleteDoc(userRef);
   } catch (error) {
     console.error("접속자 제거 오류:", error);
+    
+    // 권한 오류인 경우 무시
+    if (error.code === 'permission-denied' || error.message.includes('permissions')) {
+      console.log("권한 오류 - 접속자 제거 건너뜀");
+      return;
+    }
+    
     throw new Error("접속자 제거에 실패했습니다.");
   }
 };
@@ -129,6 +156,13 @@ export const getOnlineUsers = async () => {
     return onlineUsers;
   } catch (error) {
     console.error("접속자 목록 조회 오류:", error);
+    
+    // 권한 오류인 경우 빈 배열 반환
+    if (error.code === 'permission-denied' || error.message.includes('permissions')) {
+      console.log("권한 오류 - 빈 접속자 목록 반환");
+      return [];
+    }
+    
     throw new Error("접속자 목록을 불러오는데 실패했습니다.");
   }
 };
@@ -179,6 +213,13 @@ export const getOnlineUser = async (userId) => {
     return null;
   } catch (error) {
     console.error("접속자 조회 오류:", error);
+    
+    // 권한 오류인 경우 null 반환
+    if (error.code === 'permission-denied' || error.message.includes('permissions')) {
+      console.log("권한 오류 - 접속자 조회 실패");
+      return null;
+    }
+    
     throw new Error("접속자 정보를 불러오는데 실패했습니다.");
   }
 };
@@ -199,6 +240,15 @@ export const cleanupOfflineUsers = async () => {
     console.log(`${querySnapshot.docs.length}명의 오프라인 사용자가 정리되었습니다.`);
   } catch (error) {
     console.error("오프라인 사용자 정리 오류:", error);
+    
+    // 권한 오류인 경우 무시
+    if (error.code === 'permission-denied' || error.message.includes('permissions')) {
+      console.log("권한 오류 - 오프라인 사용자 정리 건너뜀");
+      return;
+    }
+    
+    // 다른 오류인 경우에도 무시 (정리 기능은 선택사항)
+    console.log("오프라인 사용자 정리 실패 - 계속 진행");
   }
 };
 

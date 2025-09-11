@@ -4,13 +4,21 @@ import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getKaraokePost, incrementViews, toggleLike, deleteKaraokePost } from "../util/karaokeService";
 
-import { markNotificationsByPostIdAsRead } from "../util/notificationService";
 import { formatTextWithLinks } from "../util/textUtils.jsx";
 import CommentSection from "./CommentSection";
 import UserProfileModal from "./UserProfileModal";
+import { navigateToDM } from '../util/dmUtils';
 import ReportModal from "./ReportModal";
 import { FaFlag } from 'react-icons/fa';
-import { formatAdminName, isAdmin, getEnhancedAdminStyles } from '../util/adminUtils';
+import { formatAdminName, isAdmin, getEnhancedAdminStyles, isCurrentUserAdmin } from '../util/adminUtils';
+
+const normalizeStorageUrl = (url) => {
+  if (!url || typeof url !== 'string') return url;
+  let fixed = url;
+  fixed = fixed.replace('b/tabgol-4f728.firebasestorage.app', 'b/tabgol-4f728.appspot.com');
+  fixed = fixed.replace('https://firebasestorage.app', 'https://firebasestorage.googleapis.com');
+  return fixed;
+};
 
 const KaraokeDetail = () => {
   const { id } = useParams();
@@ -71,16 +79,6 @@ const KaraokeDetail = () => {
         await incrementViews(id);
         setPost(prev => ({ ...prev, views: (prev?.views || 0) + 1 }));
         
-        // 이 노래자랑 게시글과 관련된 알림을 읽음 처리
-        try {
-          const processedCount = await markNotificationsByPostIdAsRead(id, "karaoke");
-          if (processedCount > 0) {
-                         console.log(`${processedCount}개의 노래자랑 관련 알림이 읽음 처리되었습니다.`);
-          }
-        } catch (notificationError) {
-          console.error("알림 읽음 처리 오류:", notificationError);
-          // 알림 처리 실패는 게시글 보기에 영향을 주지 않도록 함
-        }
       }
       
       // 좋아요 상태 확인
@@ -120,7 +118,7 @@ const KaraokeDetail = () => {
   };
 
   const handleDelete = async () => {
-    if (!user || post.authorId !== user.uid) {
+    if (!user || (post.authorId !== user.uid && !isCurrentUserAdmin(user))) {
       alert("삭제 권한이 없습니다.");
       return;
     }
@@ -143,7 +141,7 @@ const KaraokeDetail = () => {
   };
 
   const handleEdit = () => {
-    if (!user || post.authorId !== user.uid) {
+    if (!user || (post.authorId !== user.uid && !isCurrentUserAdmin(user))) {
       alert("수정 권한이 없습니다.");
       return;
     }
@@ -195,7 +193,7 @@ const KaraokeDetail = () => {
           <div className="max-w-4xl mx-auto px-4">
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-700 mx-auto mb-4"></div>
-                             <p className="text-amber-700">노래자랑 영상을 불러오는 중...</p>
+              <p className="text-amber-700">비디오를 불러오는 중...</p>
             </div>
           </div>
         </main>
@@ -209,13 +207,13 @@ const KaraokeDetail = () => {
         <main className="pb-20 pt-16">
           <div className="max-w-4xl mx-auto px-4">
             <div className="text-center py-12">
-              <div className="text-gray-400 text-6xl mb-4">🎤</div>
-              <p className="text-gray-600 text-lg mb-2">영상을 찾을 수 없습니다</p>
+              <div className="text-gray-400 text-6xl mb-4">🎬</div>
+              <p className="text-gray-600 text-lg mb-2">비디오를 찾을 수 없습니다</p>
               <p className="text-gray-500 mb-6">삭제되었거나 존재하지 않는 영상입니다.</p>
               <button
                 onClick={() => navigate("/karaoke")}
                 className="bg-amber-600 text-white px-6 py-3 rounded-lg hover:bg-amber-700 transition-colors"
-                title="노래자랑으로 돌아가기"
+                title="비디오로 돌아가기"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -236,7 +234,7 @@ const KaraokeDetail = () => {
           <button
             onClick={() => navigate("/karaoke")}
             className="mb-4 flex items-center justify-center w-12 h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110"
-            title="노래자랑으로 돌아가기"
+            title="비디오로 돌아가기"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
@@ -251,10 +249,24 @@ const KaraokeDetail = () => {
           }`}>
             <div className="aspect-video bg-black">
               <video
-                src={post.videoUrl}
+                src={normalizeStorageUrl(post.videoUrl)}
                 controls
                 preload="metadata"
-                poster=""
+                poster={normalizeStorageUrl(post.thumbnailUrl) || ""}
+                crossOrigin="anonymous"
+                controlsList="nodownload"
+                onError={(e) => {
+                  try {
+                    const el = e.currentTarget;
+                    console.log(`비디오 로딩 실패: ${post.videoUrl}`);
+                    // 파일이 존재하지 않는 경우 placeholder 표시
+                    el.style.display = 'none';
+                    const placeholder = el.parentElement.querySelector('.video-placeholder');
+                    if (placeholder) {
+                      placeholder.style.display = 'flex';
+                    }
+                  } catch {}
+                }}
                 className="w-full h-full object-contain"
                 onLoadedMetadata={(e) => {
                   // 동영상 메타데이터 로드 후 첫 번째 프레임을 썸네일로 사용
@@ -264,11 +276,21 @@ const KaraokeDetail = () => {
                   canvas.height = video.videoHeight;
                   const ctx = canvas.getContext('2d');
                   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                  video.poster = canvas.toDataURL();
+                  if (!post.thumbnailUrl) {
+                    video.poster = canvas.toDataURL();
+                  }
                 }}
               >
                 브라우저가 비디오 태그를 지원하지 않습니다.
               </video>
+              {/* 비디오 로딩 실패 시 표시할 placeholder */}
+              <div className="video-placeholder absolute inset-0 bg-gray-300 flex items-center justify-center text-gray-600" style={{display: 'none'}}>
+                <div className="text-center">
+                  <div className="text-6xl mb-4">🎬</div>
+                  <div className="text-lg font-medium">비디오를 불러올 수 없습니다</div>
+                  <div className="text-sm text-gray-500 mt-2">파일이 삭제되었거나 이동되었을 수 있습니다</div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -294,7 +316,7 @@ const KaraokeDetail = () => {
                     <span className="text-gray-500 text-xs mb-1">작성자</span>
                     <span 
                       className="cursor-pointer transition-colors"
-                      onClick={() => handleShowProfile(post.authorId, post.author)}
+                      onClick={() => navigateToDM(post.authorId, user, navigate)}
                       title="프로필 보기"
                     >
                       {(() => {
@@ -368,7 +390,7 @@ const KaraokeDetail = () => {
                   </button>
                 )}
                 
-                {user && post.authorId === user.uid && (
+                {user && (post.authorId === user.uid || isCurrentUserAdmin(user)) && (
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={handleEdit}

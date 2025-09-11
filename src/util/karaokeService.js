@@ -27,6 +27,24 @@ export const uploadKaraokeVideo = async (file, userId) => {
   }
 };
 
+// 노래자랑 썸네일 업로드
+export const uploadKaraokeThumbnail = async (blob, userId) => {
+  try {
+    const timestamp = Date.now();
+    const fileName = `${userId}_${timestamp}_thumb.jpg`;
+    const storageRef = ref(storage, `karaoke_thumbs/${fileName}`);
+    const snapshot = await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    return {
+      url: downloadURL,
+      fileName
+    };
+  } catch (error) {
+    console.error("썸네일 업로드 오류:", error);
+    throw new Error("썸네일 업로드에 실패했습니다.");
+  }
+};
+
 // 노래자랑 게시글 작성
 export const createKaraokePost = async (postData) => {
   try {
@@ -36,7 +54,8 @@ export const createKaraokePost = async (postData) => {
       updatedAt: serverTimestamp(),
       views: 0,
       likes: 0,
-      likedBy: []
+      likedBy: [],
+      commentCount: 0
     };
     
     const docRef = await addDoc(collection(db, "karaokePosts"), postWithTimestamp);
@@ -112,12 +131,20 @@ export const deleteKaraokePost = async (postId, fileName) => {
   try {
     // Firestore에서 게시글 삭제
     const postRef = doc(db, "karaokePosts", postId);
+    const postSnap = await getDoc(postRef);
+    const data = postSnap.exists() ? postSnap.data() : null;
     await deleteDoc(postRef);
     
     // Storage에서 영상 파일 삭제
     if (fileName) {
       const videoRef = ref(storage, `karaoke/${fileName}`);
       await deleteObject(videoRef);
+    }
+    // 썸네일 삭제
+    const thumbFile = data?.thumbnailFileName;
+    if (thumbFile) {
+      const thumbRef = ref(storage, `karaoke_thumbs/${thumbFile}`);
+      await deleteObject(thumbRef);
     }
   } catch (error) {
     console.error("노래자랑 게시글 삭제 오류:", error);

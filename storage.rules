@@ -9,8 +9,48 @@ service firebase.storage {
       // 인증된 사용자만 업로드 가능
       allow write: if request.auth != null 
         && request.resource.size < 50 * 1024 * 1024 // 50MB 제한
-        && request.resource.contentType.matches('image/.*|video/.*'); // 이미지/비디오만 허용
+        && request.resource.contentType.matches('image/.*'); // 이미지만 허용
       
+      // 업로더만 삭제 가능
+      allow delete: if request.auth != null 
+        && fileName.matches(request.auth.uid + '_.*');
+    }
+    
+    // 요리 폴더 규칙
+    match /cooking/{fileName} {
+      // 모든 인증된 사용자가 읽기 가능
+      allow read: if request.auth != null;
+      
+      // 인증된 사용자만 업로드 가능
+      allow write: if request.auth != null 
+        && request.resource.size < 10 * 1024 * 1024 // 10MB 제한
+        && request.resource.contentType.matches('image/.*'); // 이미지만 허용
+      
+      // 업로더만 삭제 가능
+      allow delete: if request.auth != null;
+    }
+
+    // 노래방 비디오 폴더 규칙
+    match /karaoke/{fileName} {
+      // 공개 읽기 (비디오 태그 재생 허용)
+      allow read: if true;
+      // 인증된 사용자만 업로드 가능 (비디오만, 100MB 이하)
+      allow write: if request.auth != null 
+        && request.resource.size < 100 * 1024 * 1024
+        && request.resource.contentType.matches('video/.*');
+      // 업로더만 삭제 가능
+      allow delete: if request.auth != null 
+        && fileName.matches(request.auth.uid + '_.*');
+    }
+
+    // 노래방 썸네일 폴더 규칙
+    match /karaoke_thumbs/{fileName} {
+      // 공개 읽기 (poster 표시 허용)
+      allow read: if true;
+      // 인증된 사용자만 업로드 가능 (이미지, 1MB 이하)
+      allow write: if request.auth != null
+        && request.resource.size < 1 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png)');
       // 업로더만 삭제 가능
       allow delete: if request.auth != null 
         && fileName.matches(request.auth.uid + '_.*');

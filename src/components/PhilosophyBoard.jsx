@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { auth } from "../util/firebase";
-import { onAuthStateChanged } from "firebase/auth";
 import { getPhilosophyPosts, toggleLike, incrementViews } from "../util/philosophyService";
 import UserProfileModal from './UserProfileModal';
+import { navigateToDM } from '../util/dmUtils';
+import { useAuth } from '../contexts/AuthContext';
 
 const PhilosophyBoard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [posts, setPosts] = useState([]);
-  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -18,18 +18,7 @@ const PhilosophyBoard = () => {
 
   useEffect(() => {
     console.log("PhilosophyBoard 컴포넌트 마운트");
-    
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      console.log("인증 상태 변경:", currentUser ? "로그인됨" : "로그아웃됨");
-      setUser(currentUser);
-      // 사용자 상태가 설정된 후 게시글 로드
-      loadPhilosophyPosts();
-    });
-
-    return () => {
-      console.log("PhilosophyBoard 컴포넌트 언마운트");
-      unsubscribe();
-    };
+    loadPhilosophyPosts();
   }, []);
 
   const loadPhilosophyPosts = async () => {
@@ -212,9 +201,9 @@ const PhilosophyBoard = () => {
                           className="font-medium text-gray-800 hover:text-amber-600 cursor-pointer transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleShowProfile(post.authorId, post.author);
+                            navigateToDM(post.authorId, user, navigate);
                           }}
-                          title="프로필 보기"
+                          title="1:1 채팅하기"
                         >
                           {post.author}
                         </span>

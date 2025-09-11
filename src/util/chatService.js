@@ -1,5 +1,5 @@
 import {
-  collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc,
+  collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc, setDoc,
   query, where, orderBy, limit, serverTimestamp, onSnapshot
 } from "firebase/firestore";
 import { db } from "./firebase";
@@ -44,8 +44,10 @@ export const subscribeToChatMessages = (callback, limitCount = 100) => {
           ...doc.data()
         };
         
-        // 모든 메시지를 포함하되, 작성자 정보 상태를 로깅
-        messages.push(messageData);
+        // 메인 채팅에 DM(type === 'dm')이 섞이지 않도록 제외
+        if (messageData.type !== 'dm') {
+          messages.push(messageData);
+        }
         
         // 작성자 정보 상태 로깅 (authorId만 있으면 정상)
         if (!messageData.authorId) {
@@ -73,8 +75,110 @@ export const subscribeToChatMessages = (callback, limitCount = 100) => {
       callback(sortedMessages);
     });
   } catch (error) {
-    console.error("채팅 메시지 구독 오류:", error);
-    throw new Error("메시지를 불러오는데 실패했습니다.");
+    // BloomFilter 오류는 무시하고 다른 오류만 로깅
+    if (error.name !== 'BloomFilterError') {
+      console.error("채팅 메시지 구독 오류:", error);
+      throw new Error("메시지를 불러오는데 실패했습니다.");
+    }
+  }
+};
+
+// 1:1 채팅 구독 (threadKey 기반)
+export const subscribeToDirectMessages = (currentUserId, targetUserId, callback, limitCount = 200) => {
+  try {
+    if (!currentUserId || !targetUserId) {
+      throw new Error("구독에 필요한 사용자 ID가 없습니다.");
+    }
+
+    const [a, b] = [currentUserId, targetUserId].sort();
+    const threadKey = `${a}__${b}`;
+
+    // 인덱스 없이 동작하도록: 서버 정렬/복합 where 제거 → 클라이언트 정렬
+    const q = query(
+      collection(db, "chatMessages"),
+      where("threadKey", "==", threadKey)
+    );
+
+    return onSnapshot(q, (querySnapshot) => {
+      const messages = [];
+      querySnapshot.forEach((doc) => {
+        messages.push({ id: doc.id, ...doc.data() });
+      });
+      // createdAt 기준 오름차순 정렬 (null 안전 처리)
+      messages.sort((m1, m2) => {
+        const t1 = m1.createdAt?.toDate ? m1.createdAt.toDate().getTime() : 0;
+        const t2 = m2.createdAt?.toDate ? m2.createdAt.toDate().getTime() : 0;
+        return t1 - t2;
+      });
+      // 필요 시 개수 제한
+      const limited = limitCount ? messages.slice(-limitCount) : messages;
+      callback(limited);
+    });
+  } catch (error) {
+    // BloomFilter 오류는 무시하고 다른 오류만 로깅
+    if (error.name !== 'BloomFilterError') {
+      console.error("1:1 채팅 구독 오류:", error);
+      throw new Error("1:1 메시지를 불러오는데 실패했습니다.");
+    }
+  }
+};
+
+// 1:1 채팅 메시지 작성
+export const createDirectMessage = async (currentUser, targetUserId, content, extra = {}) => {
+  try {
+    if (!currentUser || !targetUserId) {
+      throw new Error("메시지 작성에 필요한 사용자 정보가 없습니다.");
+    }
+    const [a, b] = [currentUser.uid, targetUserId].sort();
+    const threadKey = `${a}__${b}`;
+
+    const message = {
+      type: "dm",
+      threadKey,
+      content,
+      author: extra.authorName || currentUser.displayName || "익명",
+      authorName: extra.authorName || currentUser.displayName || "익명",
+      authorId: currentUser.uid,
+      authorEmail: currentUser.email,
+      recipientId: targetUserId,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    const docRef = await addDoc(collection(db, "chatMessages"), message);
+
+    // DM 스레드 upsert
+    const participants = [a, b];
+    const threadRef = doc(db, "chatThreads", threadKey);
+    const threadData = {
+      type: "dm",
+      threadKey,
+      participants,
+      lastMessage: content,
+      lastAuthorId: currentUser.uid,
+      lastAuthorName: message.authorName,
+      updatedAt: serverTimestamp(),
+    };
+    try {
+      const existing = await getDoc(threadRef);
+      if (existing.exists()) {
+        // 기존 스레드 업데이트
+        await updateDoc(threadRef, threadData);
+        console.log("스레드 업데이트 성공:", threadKey);
+      } else {
+        // 새 스레드 생성
+        await setDoc(threadRef, { ...threadData, createdAt: serverTimestamp() });
+        console.log("스레드 생성 성공:", threadKey);
+      }
+    } catch (e) {
+      console.error("스레드 업데이트 실패:", e?.code, e?.message);
+      // 스레드 업데이트 실패해도 메시지 전송은 계속 진행
+    }
+
+    return { id: docRef.id, ...message };
+  } catch (error) {
+    console.error("1:1 채팅 메시지 작성 오류:", error);
+    throw new Error("1:1 메시지 작성에 실패했습니다.");
   }
 };
 
