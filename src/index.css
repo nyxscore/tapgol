@@ -3,14 +3,300 @@
 /* 한글 폰트 설정 */
 @import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap");
 
+/* 모바일 최적화 */
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+}
+
 body {
   font-family: "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI",
     "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
     "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+  background-color: #f9fafb;
+  overflow-x: hidden;
 }
 
 * {
   font-family: inherit;
+  box-sizing: border-box;
+}
+
+/* Safe area insets for mobile devices */
+.safe-area-inset-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Touch-friendly buttons */
+button, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* 터치 줌 기능 */
+body {
+  touch-action: pan-x pan-y pinch-zoom;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* 이미지와 텍스트는 선택 가능하게 */
+img, p, span, div[contenteditable] {
+  user-select: auto;
+  -webkit-user-select: auto;
+}
+
+/* 줌 가능한 요소들 */
+.zoomable {
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+/* 전체 콘텐츠 줌 기능 */
+.content-zoom-container {
+  touch-action: pan-x pan-y pinch-zoom;
+  transition: transform 0.3s ease-out;
+  transform-origin: center center;
+}
+
+.content-zoom-container.zoomed {
+  transform: scale(1.2);
+}
+
+/* 더블탭 줌 효과 */
+.double-tap-zoom {
+  transition: transform 0.3s ease-out;
+}
+
+.double-tap-zoom.zoomed {
+  transform: scale(1.1);
+}
+
+/* 스크롤바 숨기기 */
+.scrollbar-hide {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* WebKit */
+}
+
+/* 부드러운 마우스 휠 스크롤 */
+.smooth-wheel-scroll {
+  scroll-behavior: smooth;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+/* Instagram-like line clamp utility */
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.line-clamp-3 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+/* Gallery 이미지 최적화 - 강력한 우선순위 */
+.gallery-grid .gallery-container {
+  aspect-ratio: 1 / 1;
+  min-height: 120px;
+  position: relative;
+  overflow: hidden;
+  background-color: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gallery-grid .gallery-container .gallery-image {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  display: block !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  outline: none !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  min-width: 100% !important;
+  min-height: 100% !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 1 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  filter: none !important;
+  transform: none !important;
+}
+
+/* 갤러리 이미지 로딩 상태 */
+.gallery-grid .gallery-container .gallery-image:not([src]) {
+  background-color: #e5e7eb !important;
+}
+
+.gallery-grid .gallery-container .gallery-image[src=""] {
+  background-color: #e5e7eb !important;
+}
+
+/* 갤러리 그리드 최적화 */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background-color: white;
+  padding: 1px;
+}
+
+/* Tailwind CSS 우선순위 무시 */
+.gallery-grid img.gallery-image {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  background-color: transparent !important;
+  display: block !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+}
+
+/* 갤러리 툴팁 스타일 */
+.gallery-grid .gallery-container .gallery-title-tooltip {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 100%);
+  padding: 8px;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.gallery-grid .gallery-container:hover .gallery-title-tooltip {
+  opacity: 1;
+}
+
+.gallery-grid .gallery-container .gallery-title-tooltip p {
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  margin: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.gallery-grid .gallery-container .gallery-title-tooltip p:first-child {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.gallery-grid .gallery-container .gallery-title-tooltip p:last-child {
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.9;
+  margin-top: 4px;
+}
+
+/* 툴팁 내부의 flex 레이아웃 스타일 */
+.gallery-grid .gallery-container .gallery-title-tooltip .flex {
+  color: white;
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.9;
+  margin-top: 4px;
+}
+
+.gallery-grid .gallery-container .gallery-title-tooltip .flex span {
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.gallery-grid .gallery-container .gallery-title-tooltip svg {
+  color: white;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+}
+
+/* 비디오 오버레이 제어 */
+.video-playing .group\/overlay {
+  opacity: 0 !important;
+}
+
+.video-playing:hover .group\/overlay {
+  opacity: 0 !important;
+}
+
+.video-paused .group\/overlay {
+  opacity: 0;
+}
+
+.video-paused:hover .group\/overlay {
+  opacity: 1;
+}
+
+/* 모바일에서 이미지 렌더링 개선 */
+@media (max-width: 768px) {
+  .gallery-image {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+}
+
+/* Notification badge animation */
+.notification-badge {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }

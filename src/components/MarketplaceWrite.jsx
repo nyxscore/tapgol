@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { createMarketplacePost } from '../util/marketplaceService';
+import { getCurrentUserProfile } from '../util/userService';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../util/firebase';
 import { FaUpload, FaTimes, FaArrowLeft } from 'react-icons/fa';
@@ -16,8 +17,24 @@ const MarketplaceWrite = () => {
   const [imageUrls, setImageUrls] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [userData, setUserData] = useState(null);
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // 사용자 프로필 정보 가져오기
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (user) {
+        try {
+          const profile = await getCurrentUserProfile();
+          setUserData(profile);
+        } catch (error) {
+          console.error('사용자 프로필 로드 오류:', error);
+        }
+      }
+    };
+    fetchUserProfile();
+  }, [user]);
 
   const categories = [
     { value: '', label: '카테고리 선택' },
@@ -96,7 +113,7 @@ const MarketplaceWrite = () => {
         location: location.trim(),
         images: imageUrls,
         authorId: user.uid,
-        author: user?.displayName || user?.email
+        author: userData?.nickname || userData?.name || user?.displayName || user?.email || "익명"
       };
 
       await createMarketplacePost(postData);

@@ -10,6 +10,7 @@ import { navigateToDM } from '../util/dmUtils';
 import ReportModal from "./ReportModal";
 import { FaFlag } from 'react-icons/fa';
 import { formatAdminName, isAdmin, getEnhancedAdminStyles, isCurrentUserAdmin } from '../util/adminUtils';
+import { useContentZoom } from '../hooks/useContentZoom';
 
 const GalleryDetail = () => {
   const { id } = useParams();
@@ -30,6 +31,19 @@ const GalleryDetail = () => {
 
   // 신고 관련 상태
   const [showReportModal, setShowReportModal] = useState(false);
+
+  // 터치 줌 기능
+  const {
+    scale,
+    position,
+    isZoomed,
+    elementRef,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
+    handleDoubleClick,
+    resetZoom
+  } = useContentZoom(1, 0.8, 2);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -329,12 +343,23 @@ const GalleryDetail = () => {
           </div>
         </div>
 
-        {/* 갤러리 항목 내용 */}
-        <div className={`rounded-2xl shadow-xl p-6 mb-6 ${
-          isAdmin(item?.authorEmail) 
-            ? getEnhancedAdminStyles().container
-            : 'bg-white'
-        }`}>
+        {/* 갤러리 항목 내용 - 줌 가능 */}
+        <div 
+          ref={elementRef}
+          className={`content-zoom-container rounded-2xl shadow-xl p-6 mb-6 ${
+            isAdmin(item?.authorEmail) 
+              ? getEnhancedAdminStyles().container
+              : 'bg-white'
+          }`}
+          style={{
+            transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
+            transition: isZoomed ? 'none' : 'transform 0.3s ease-out'
+          }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onDoubleClick={handleDoubleClick}
+        >
           {isAdmin(item?.authorEmail) && (
             <>
               <div className={getEnhancedAdminStyles().glowEffect}></div>
@@ -408,8 +433,8 @@ const GalleryDetail = () => {
               <div className="flex flex-col">
                 <span className="text-gray-500 text-xs mb-1">업로더</span>
                 <span 
-                  className="cursor-pointer transition-colors"
-                  onClick={() => navigateToDM(item.uploaderId, user, navigate)}
+                  className="cursor-pointer transition-colors hover:text-blue-600"
+                  onClick={() => handleShowProfile(item.uploaderId, item.uploader)}
                   title="프로필 보기"
                 >
                   {(() => {
@@ -556,6 +581,29 @@ const GalleryDetail = () => {
           <CommentSection postId={id} boardType="gallery" />
         </div>
       </div>
+
+      {/* 줌 상태 표시 */}
+      {isZoomed && (
+        <div className="fixed top-20 right-4 bg-black bg-opacity-60 text-white px-3 py-1 rounded-full text-sm font-medium z-50">
+          {Math.round(scale * 100)}%
+        </div>
+      )}
+      
+      {/* 줌 리셋 버튼 */}
+      {isZoomed && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            resetZoom();
+          }}
+          className="fixed bottom-20 right-4 bg-black bg-opacity-60 text-white p-3 rounded-full hover:bg-opacity-80 transition-all z-50"
+          title="줌 리셋"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+      )}
 
       {/* 사용자 프로필 모달 */}
       <UserProfileModal

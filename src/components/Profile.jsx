@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { updateProfile, updateEmail, onAuthStateChanged, deleteUser, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { signOut } from "firebase/auth";
-import { getUserProfile, updateUserProfile, deleteUserAccount } from "../util/userService";
+import { getUserProfile, getCurrentUserProfile, updateUserProfile, deleteUserAccount } from "../util/userService";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { storage } from "../util/firebase";
 import { FaCamera, FaTrash, FaEdit } from "react-icons/fa";
@@ -23,6 +23,7 @@ const Profile = () => {
   const [imagePreview, setImagePreview] = useState(null);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
+  const { userId } = useParams(); // URL 파라미터에서 userId 가져오기
 
   const interests = [
     "탁구", "바둑", "장기", "고스톱", "노래자랑", "운동", "독서", "게임", "음악", "영화"
@@ -41,32 +42,36 @@ const Profile = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        // 사용자 객체가 유효한지 확인
-        try {
-          // getIdToken을 호출하여 사용자 객체가 유효한지 테스트
-          await currentUser.getIdToken(true);
-          setUser(currentUser);
-          
-          // Firestore에서 추가 사용자 정보 가져오기
+      if (!currentUser) {
+        // 로그인하지 않은 경우 로그인 페이지로 이동
+        navigate("/login");
+        return;
+      }
+      
+      try {
+        setUser(currentUser);
+        
+        // URL 파라미터로 userId가 있으면 해당 사용자의 프로필 조회, 없으면 본인 프로필 조회
+        if (userId) {
+          // 다른 사용자의 프로필 조회
           try {
-            const userProfile = await getUserProfile(currentUser.uid);
+            const userProfile = await getUserProfile(userId);
             setUserData(userProfile);
             setForm({
-              name: userProfile.name || currentUser.displayName || "",
-              email: currentUser.email || "",
-              nickname: userProfile.nickname || "",
-              phone: userProfile.phone || "",
-              birthDate: userProfile.birthDate || "",
-              gender: userProfile.gender || "",
-              address: userProfile.address || "",
-              interests: userProfile.interests || []
+              name: userProfile?.name || "",
+              email: userProfile?.email || "",
+              nickname: userProfile?.nickname || "",
+              phone: userProfile?.phone || "",
+              birthDate: userProfile?.birthDate || "",
+              gender: userProfile?.gender || "",
+              address: userProfile?.address || "",
+              interests: userProfile?.interests || []
             });
           } catch (error) {
             console.error("사용자 정보 로드 오류:", error);
             setForm({
-              name: currentUser.displayName || "",
-              email: currentUser.email || "",
+              name: "",
+              email: "",
               nickname: "",
               phone: "",
               birthDate: "",
@@ -75,23 +80,44 @@ const Profile = () => {
               interests: []
             });
           }
-        } catch (authError) {
-          console.error("사용자 인증 오류:", authError);
-          setError("사용자 인증에 문제가 있습니다. 다시 로그인해주세요.");
-          // 인증에 문제가 있으면 로그아웃 처리
-          await signOut(auth);
-          navigate("/login");
-          return;
+        } else {
+          // 본인 프로필 조회
+          try {
+            const userProfile = await getCurrentUserProfile();
+            setUserData(userProfile);
+            setForm({
+              name: userProfile?.name || "",
+              email: userProfile?.email || "",
+              nickname: userProfile?.nickname || "",
+              phone: userProfile?.phone || "",
+              birthDate: userProfile?.birthDate || "",
+              gender: userProfile?.gender || "",
+              address: userProfile?.address || "",
+              interests: userProfile?.interests || []
+            });
+          } catch (error) {
+            console.error("본인 프로필 로드 오류:", error);
+            setForm({
+              name: "",
+              email: "",
+              nickname: "",
+              phone: "",
+              birthDate: "",
+              gender: "",
+              address: "",
+              interests: []
+            });
+          }
         }
-      } else {
-        // 로그인되지 않은 경우 로그인 페이지로 이동
-        navigate("/login");
+      } catch (error) {
+        console.error("사용자 프로필 조회 오류:", error);
+        setError("사용자 프로필을 불러오는데 실패했습니다.");
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [navigate]);
+  }, [userId, navigate]); // userId가 변경될 때마다 다시 실행
 
   const handleChange = (e) => {
     const { name, value, type } = e.target;
@@ -491,14 +517,14 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 pb-20">
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="max-w-4xl mx-auto p-6 pt-20">
         {/* 헤더 */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
           <h1 className="text-3xl font-bold text-amber-700 mb-2 text-center">
-            내 정보
+            {userId ? '프로필' : '내 정보'}
           </h1>
           <p className="text-gray-600 text-center">
-            회원정보를 확인하고 수정할 수 있습니다
+            {userId ? '사용자 프로필을 확인할 수 있습니다' : '회원정보를 확인하고 수정할 수 있습니다'}
           </p>
         </div>
 
@@ -538,10 +564,10 @@ const Profile = () => {
           <div className="flex items-center mb-6">
             <div className="relative mr-4">
               <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-amber-200">
-                {user.photoURL || userData?.profileImage ? (
+                {userData?.profileImage ? (
                   <>
                     <img 
-                      src={user.photoURL || userData?.profileImage} 
+                      src={userData.profileImage} 
                       alt="Profile" 
                       className="w-full h-full object-cover"
                       onError={(e) => {
@@ -550,12 +576,12 @@ const Profile = () => {
                       }}
                     />
                     <div className="w-full h-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-2xl font-bold" style={{ display: 'none' }}>
-                      {user?.displayName ? user.displayName.charAt(0) : user?.email?.charAt(0) || "U"}
+                      {userData?.name ? userData.name.charAt(0) : userData?.nickname?.charAt(0) || "U"}
                     </div>
                   </>
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-2xl font-bold">
-                    {user?.displayName ? user.displayName.charAt(0) : user?.email?.charAt(0) || "U"}
+                    {userData?.name ? userData.name.charAt(0) : userData?.nickname?.charAt(0) || "U"}
                   </div>
                 )}
               </div>
@@ -573,14 +599,13 @@ const Profile = () => {
             </div>
             <div>
               <h2 className="text-xl font-bold text-gray-800">
-                {user?.displayName || "사용자"}
+                {userData?.name || userData?.nickname || "사용자"}
               </h2>
-              <p className="text-gray-600">{user.email}</p>
+              <p className="text-gray-600">{userData?.email || "이메일 정보 없음"}</p>
               <p className="text-sm text-gray-500">
-                가입일: {user.metadata?.creationTime 
+                {userId ? "회원" : "가입일: " + (user?.metadata?.creationTime 
                   ? new Date(user.metadata.creationTime).toLocaleDateString('ko-KR')
-                  : "알 수 없음"
-                }
+                  : "알 수 없음")}
               </p>
             </div>
           </div>
@@ -782,23 +807,27 @@ const Profile = () => {
               </button>
             </div>
           ) : (
+            !userId && (
+              <button
+                onClick={handleEdit}
+                className="w-full bg-amber-700 text-white font-semibold py-3 px-6 rounded-lg hover:bg-amber-800 transition-colors"
+              >
+                정보 수정
+              </button>
+            )
+          )}
+
+          {!userId && (
             <button
-              onClick={handleEdit}
-              className="w-full bg-amber-700 text-white font-semibold py-3 px-6 rounded-lg hover:bg-amber-800 transition-colors"
+              onClick={handleLogout}
+              className="w-full bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors"
             >
-              정보 수정
+              로그아웃
             </button>
           )}
 
-          <button
-            onClick={handleLogout}
-            className="w-full bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors"
-          >
-            로그아웃
-          </button>
-
           {/* 프로필 이미지 업로드/삭제 */}
-          {editing && (
+          {editing && !userId && (
             <div className="border-t pt-4">
               <h3 className="text-lg font-semibold text-gray-800 mb-3">
                 프로필 이미지 관리

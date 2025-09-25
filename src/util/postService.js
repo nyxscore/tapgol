@@ -13,6 +13,7 @@ import {
   serverTimestamp,
   increment
 } from "firebase/firestore";
+import { getUserProfile } from "./userService";
 import { db } from "./firebase";
 
 // 게시글 작성
@@ -59,6 +60,54 @@ export const getPosts = async (limitCount = 20) => {
   } catch (error) {
     console.error("게시글 목록 조회 오류:", error);
     throw new Error("게시글 목록을 불러오는데 실패했습니다.");
+  }
+};
+
+// 모든 게시글 조회 (제한 없음)
+export const getAllPosts = async () => {
+  try {
+    const q = query(
+      collection(db, "posts"),
+      orderBy("createdAt", "desc")
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const posts = [];
+    
+    // 각 게시글에 대해 작성자 정보를 동적으로 조회
+    for (const docSnapshot of querySnapshot.docs) {
+      const postData = docSnapshot.data();
+      let authorName = postData.author || "익명";
+      
+      // authorId가 있고 author가 "익명"이거나 없으면 사용자 프로필에서 조회
+      if (postData.authorId && (!postData.author || postData.author === "익명")) {
+        try {
+          const userProfile = await getUserProfile(postData.authorId);
+          if (userProfile) {
+            authorName = userProfile.nickname || userProfile.name || userProfile.displayName || "익명";
+            // 작성자 정보를 업데이트 (선택적)
+            if (authorName !== "익명") {
+              updateDoc(doc(db, "posts", docSnapshot.id), {
+                author: authorName
+              }).catch(err => console.log("작성자 정보 업데이트 실패:", err));
+            }
+          }
+        } catch (error) {
+          console.log("작성자 정보 조회 실패:", error);
+        }
+      }
+      
+      posts.push({
+        id: docSnapshot.id,
+        ...postData,
+        author: authorName
+      });
+    }
+    
+    return posts;
+  } catch (error) {
+    console.error("모든 게시글 조회 오류:", error);
+    throw new Error("게시글을 불러오는데 실패했습니다.");
   }
 };
 

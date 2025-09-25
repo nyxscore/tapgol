@@ -1,10 +1,10 @@
-// src/components/HealthBoard.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { getHealthPosts, toggleLike, incrementViews } from "../util/healthService";
+import { getComments } from "../util/commentService";
 import UserProfileModal from './UserProfileModal';
 import { navigateToDM } from '../util/dmUtils';
 
@@ -14,31 +14,28 @@ const HealthBoard = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [commentCounts, setCommentCounts] = useState({});
 
   // 프로필 모달 관련 상태
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
-    console.log("HealthBoard 컴포넌트 마운트");
-    
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      console.log("인증 상태 변경:", currentUser ? "로그인됨" : "로그아웃됨");
       setUser(currentUser);
     });
 
-    // 실시간 건강정보 게시글 구독 (최적화된 쿼리)
+    // 실시간 건강정보 게시글 구독
     const q = query(
       collection(db, "healthPosts"),
       orderBy("createdAt", "desc")
     );
 
     const unsubscribePosts = onSnapshot(q, 
-      { includeMetadataChanges: true }, // 메타데이터 변경도 감지하여 삭제 즉시 반영
+      { includeMetadataChanges: true },
       (querySnapshot) => {
         const postsData = [];
         querySnapshot.forEach((doc) => {
-          // 삭제된 문서는 제외
           if (doc.exists()) {
             postsData.push({
               id: doc.id,
@@ -46,89 +43,67 @@ const HealthBoard = () => {
             });
           }
         });
-        console.log("로드된 건강정보 게시글:", postsData);
         setPosts(postsData);
+        
+        // 댓글 수 계산
+        const calculateAllCommentCounts = async () => {
+          const counts = {};
+          for (const post of postsData) {
+            counts[post.id] = await calculateCommentCount(post.id);
+          }
+          setCommentCounts(counts);
+        };
+        
+        calculateAllCommentCounts();
         setLoading(false);
       }, 
       (error) => {
         console.error("건강정보 게시글 실시간 구독 오류:", error);
-        // BloomFilter 오류는 무시 (기능에 영향 없음)
-        if (error.name !== 'BloomFilterError') {
-          setLoading(false);
-        }
+        setError("게시글을 불러오는데 실패했습니다.");
+        setLoading(false);
       }
     );
 
     return () => {
-      console.log("HealthBoard 컴포넌트 언마운트");
       unsubscribe();
       unsubscribePosts();
     };
   }, []);
 
-  const loadHealthPosts = async () => {
-    try {
-      console.log("loadHealthPosts 함수 시작");
-      setLoading(true);
-      setError(null);
-      const postsData = await getHealthPosts();
-      console.log("로드된 건강정보 게시글:", postsData);
-      setPosts(postsData);
-    } catch (error) {
-      console.error("건강정보 게시글 로드 오류:", error);
-      setError("게시글을 불러오는데 실패했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePostClick = async (postId) => {
-    try {
-      // 조회수 증가 (로그인한 사용자만)
-      if (user) {
-        await incrementViews(postId);
-      }
-      navigate(`/health/${postId}`);
-    } catch (error) {
-      console.error("조회수 증가 오류:", error);
-      navigate(`/health/${postId}`);
-    }
+  const handlePostClick = (postId) => {
+    navigate(`/health/${postId}`);
   };
 
   const handleWriteClick = () => {
     if (!user) {
-      alert("글을 작성하려면 로그인이 필요합니다.");
-      navigate("/login");
+      alert('로그인이 필요합니다.');
+      navigate('/login');
       return;
     }
-    navigate("/health/write");
+    navigate('/health/write');
   };
 
-  const handleLike = async (e, postId) => {
-    e.stopPropagation(); // 이벤트 버블링 방지
-    
+  const handleLike = async (postId, e) => {
+    e.stopPropagation();
     if (!user) {
-      alert("좋아요를 누르려면 로그인이 필요합니다.");
-      navigate("/login");
+      alert('로그인이 필요합니다.');
+      navigate('/login');
       return;
     }
 
     try {
       const isLiked = await toggleLike(postId, user.uid);
-      
-      // 로컬 상태 업데이트
-      setPosts(prev => prev.map(post => {
-        if (post.id === postId) {
-          return {
-            ...post,
-            likes: isLiked ? (post.likes || 0) + 1 : (post.likes || 0) - 1,
-            likedBy: isLiked 
-              ? [...(post.likedBy || []), user.uid]
-              : (post.likedBy || []).filter(uid => uid !== user.uid)
-          };
-        }
-        return post;
-      }));
+      setPosts(posts.map(post => 
+        post.id === postId 
+          ? {
+              ...post,
+              likes: isLiked ? (post.likes || 0) + 1 : Math.max(0, (post.likes || 0) - 1),
+              likedBy: isLiked 
+                ? [...(post.likedBy || []), user.uid]
+                : (post.likedBy || []).filter(uid => uid !== user.uid)
+            }
+          : post
+      ));
     } catch (error) {
       console.error("좋아요 처리 오류:", error);
       alert("좋아요 처리에 실패했습니다.");
@@ -146,6 +121,16 @@ const HealthBoard = () => {
     });
   };
 
+  const calculateCommentCount = async (postId) => {
+    try {
+      const comments = await getComments(postId);
+      return comments.length;
+    } catch (error) {
+      console.error(`댓글 수 계산 오류 (${postId}):`, error);
+      return 0;
+    }
+  };
+
   const isLikedByUser = (post) => {
     return user && post.likedBy?.includes(user.uid);
   };
@@ -161,161 +146,123 @@ const HealthBoard = () => {
     setSelectedUser(null);
   };
 
-  const getCategoryColor = (category) => {
-    const colors = {
-      '일반': 'bg-gray-100 text-gray-800',
-      '운동': 'bg-blue-100 text-blue-800',
-      '영양': 'bg-green-100 text-green-800',
-      '질병예방': 'bg-red-100 text-red-800',
-      '정신건강': 'bg-purple-100 text-purple-800',
-      '노화관리': 'bg-orange-100 text-orange-800',
-      '기타': 'bg-yellow-100 text-yellow-800'
-    };
-    return colors[category] || colors['기타'];
-  };
-
-  console.log("HealthBoard 렌더링 - 상태:", { loading, error, postsCount: posts.length, user: !!user });
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
-        <main className="pb-20 pt-16">
-          <div className="max-w-4xl mx-auto px-4">
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-700 mx-auto mb-4"></div>
-              <p className="text-amber-700">건강정보를 불러오는 중...</p>
-            </div>
-          </div>
-        </main>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">건강정보를 불러오는 중...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
-        <main className="pb-20 pt-16">
-          <div className="max-w-4xl mx-auto px-4">
-            <div className="text-center py-12">
-              <p className="text-red-600 text-lg mb-4">{error}</p>
-              <button
-                onClick={loadHealthPosts}
-                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
-              >
-                다시 시도
-              </button>
-            </div>
-          </div>
-        </main>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h3 className="text-xl font-semibold text-gray-700 mb-2">오류가 발생했습니다</h3>
+          <p className="text-gray-500 mb-6">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+          >
+            다시 시도
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
-      <main className="pb-20 pt-16">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <h1 className="text-2xl font-bold text-gray-800">건강정보</h1>
-              <button
-                onClick={handleWriteClick}
-                className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center space-x-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                <span>글쓰기</span>
-              </button>
-            </div>
-            <p className="text-gray-600">유용한 건강 정보를 공유하고 소통해보세요</p>
+    <div className="min-h-screen bg-white pt-14 pb-20">
+      <div className="max-w-md mx-auto">
+        {/* 헤더 */}
+        <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-14 z-10">
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg font-semibold text-gray-800">건강정보</h1>
+            <button
+              onClick={handleWriteClick}
+              className="px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors flex items-center justify-center space-x-1 text-xs"
+              title="건강정보 글쓰기"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>글쓰기</span>
+            </button>
           </div>
+        </div>
 
-          {posts.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-gray-400 text-6xl mb-4">🏥</div>
-              <p className="text-gray-600 text-lg mb-2">아직 건강정보 게시글이 없습니다</p>
-              <p className="text-gray-500 mb-6">첫 번째 건강정보를 공유해보세요!</p>
-              <button
-                onClick={handleWriteClick}
-                className="bg-amber-600 text-white px-6 py-3 rounded-lg hover:bg-amber-700 transition-colors"
+        {/* 게시글 목록 */}
+        {posts.length === 0 ? (
+          <div className="bg-white p-8 text-center">
+            <div className="text-6xl mb-4">🏥</div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">아직 건강정보 게시글이 없습니다</h3>
+            <p className="text-gray-600 mb-4">첫 번째 건강정보를 공유해보세요!</p>
+            <button
+              onClick={handleWriteClick}
+              className="bg-amber-600 text-white px-6 py-3 rounded-lg hover:bg-amber-700 transition-colors"
+            >
+              건강정보 작성하기
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {posts.map((post) => (
+              <div
+                key={post.id}
+                onClick={() => handlePostClick(post.id)}
+                className="bg-white border-b border-gray-100 p-4 cursor-pointer hover:bg-gray-50 transition-colors"
               >
-                건강정보 작성하기
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {posts.map((post) => (
-                <div
-                  key={post.id}
-                  onClick={() => handlePostClick(post.id)}
-                  className="bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-shadow"
-                >
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getCategoryColor(post.category)}`}>
-                        {post.category}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                      <div className="flex flex-col">
-                        <span className="text-gray-500 text-xs mb-1">작성자</span>
-                        <span 
-                          className="font-medium text-gray-800 hover:text-amber-600 cursor-pointer transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigateToDM(post.authorId, user, navigate);
-                          }}
-                          title="프로필 보기"
-                        >
-                          {post.author}
-                        </span>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-gray-500 text-xs mb-1">작성일</span>
-                        <span className="text-gray-600">{formatDate(post.createdAt)}</span>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-gray-500 text-xs mb-1">조회수</span>
-                        <div className="flex items-center space-x-1">
-                          <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                            <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                          </svg>
-                          <span className="text-gray-600">{post.views || 0}</span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-gray-500 text-xs mb-1">좋아요</span>
-                        <div className="flex items-center space-x-1">
-                          <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                          </svg>
-                          <span className="text-gray-600">{post.likes || 0}</span>
-                        </div>
-                      </div>
-                    </div>
+                {/* 작성자 정보 */}
+                <div className="flex items-center space-x-3 mb-3">
+                  <div className="w-8 h-8 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm font-medium">
+                      {(post.author || "익명").charAt(0)}
+                    </span>
                   </div>
-                  
-                  <h2 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2">
-                    {post.title}
-                  </h2>
-                  
-                  <p className="text-gray-700 mb-4 line-clamp-3">
-                    {post.content}
-                  </p>
-                  
-                  <div className="flex items-center justify-end">
-                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      <span 
+                        className="font-medium text-gray-800 text-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigateToDM(post.authorId, user, navigate);
+                        }}
+                      >
+                        {post.author || "익명"}
+                      </span>
+                      <span className="text-gray-400 text-xs">•</span>
+                      <span className="text-gray-400 text-xs">{formatDate(post.createdAt)}</span>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </main>
+
+                {/* 게시글 내용 */}
+                <div className="mb-3">
+                  <h3 className="font-semibold text-gray-900 text-base mb-2 line-clamp-2 leading-tight">
+                    {post.title}
+                  </h3>
+                  <p className="text-gray-600 text-sm line-clamp-3 leading-relaxed">
+                    {post.content}
+                  </p>
+                </div>
+
+                {/* 하단 통계 */}
+                <div className="flex items-center justify-between text-gray-500 text-xs">
+                  <div className="flex items-center space-x-4">
+                    <span>{post.views || 0} 조회</span>
+                    <span>{post.likes || 0} 좋아요</span>
+                    <span>{commentCounts[post.id] || 0} 댓글</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* 사용자 프로필 모달 */}
       <UserProfileModal

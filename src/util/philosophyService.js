@@ -14,6 +14,7 @@ import {
   increment
 } from "firebase/firestore";
 import { db, auth } from "./firebase";
+import { getUserProfile } from "./userService";
 
 // 개똥철학 게시글 생성
 export const createPhilosophyPost = async (postData) => {
@@ -50,9 +51,7 @@ export const getPhilosophyPosts = async (limitCount = 20) => {
       console.log("posts 컬렉션에서 개똥철학 게시글 조회 중...");
       const postsQuery = query(
         collection(db, "posts"),
-        where("category", "==", "philosophy"),
-        orderBy("createdAt", "desc"),
-        limit(limitCount)
+        where("category", "==", "philosophy")
       );
       
       const postsSnapshot = await getDocs(postsQuery);
@@ -65,7 +64,6 @@ export const getPhilosophyPosts = async (limitCount = 20) => {
         });
       });
     } catch (postsError) {
-      console.log("posts 컬렉션 조회 실패:", postsError.message);
     }
     
     // 1-2. posts 컬렉션에서 모든 데이터 확인 (개똥철학 관련 키워드 검색)
@@ -98,7 +96,6 @@ export const getPhilosophyPosts = async (limitCount = 20) => {
         }
       });
     } catch (allPostsError) {
-      console.log("posts 컬렉션 전체 조회 실패:", allPostsError.message);
     }
     
     // 2. 기존 philosophy 컬렉션에서도 조회 (권한이 있다면)
@@ -132,13 +129,12 @@ export const getPhilosophyPosts = async (limitCount = 20) => {
           console.log(`${collectionName} 컬렉션에 데이터가 없습니다.`);
         }
       } catch (collectionError) {
-        console.log(`${collectionName} 컬렉션 조회 실패:`, collectionError);
         console.log("오류 코드:", collectionError.code);
         console.log("오류 메시지:", collectionError.message);
       }
     }
     
-    // 3. 생성일 기준으로 정렬하고 중복 제거
+    // 3. 중복 제거 및 클라이언트 사이드 정렬 (인덱스 불필요)
     const uniquePosts = allPosts.reduce((acc, post) => {
       const existingPost = acc.find(p => p.id === post.id);
       if (!existingPost) {
@@ -147,7 +143,7 @@ export const getPhilosophyPosts = async (limitCount = 20) => {
       return acc;
     }, []);
     
-    // 생성일 기준으로 정렬
+    // 클라이언트 사이드에서 정렬하여 복합 인덱스 요구사항 제거
     uniquePosts.sort((a, b) => {
       const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
       const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
@@ -196,7 +192,6 @@ export const getPhilosophyPost = async (postId) => {
         }
       }
     } catch (postsError) {
-      console.log("posts 컬렉션에서 조회 실패:", postsError.message);
     }
     
     // 2. philosophy 컬렉션에서 조회
@@ -212,7 +207,6 @@ export const getPhilosophyPost = async (postId) => {
         };
       }
     } catch (philosophyError) {
-      console.log("philosophy 컬렉션에서 조회 실패:", philosophyError.message);
     }
     
     throw new Error("개똥철학 게시글을 찾을 수 없습니다.");
@@ -252,21 +246,117 @@ export const updatePhilosophyPost = async (postId, updateData) => {
 // 개똥철학 게시글 삭제
 export const deletePhilosophyPost = async (postId) => {
   try {
-    // 먼저 posts 컬렉션에서 시도
+    console.log("개똥철학 게시글 삭제 시도:", postId);
+    
+    let postsDeleted = false;
+    let philosophyDeleted = false;
+    
+    // posts 컬렉션에서 삭제 시도
     try {
+      console.log("posts 컬렉션에서 삭제 시도...");
       const postsRef = doc(db, "posts", postId);
       await deleteDoc(postsRef);
-      return;
+      console.log("posts 컬렉션에서 삭제 성공");
+      postsDeleted = true;
     } catch (postsError) {
       console.log("posts 컬렉션 삭제 실패:", postsError.message);
+      
+      // 권한 오류인 경우 더 자세한 정보 제공
+      if (postsError.code === 'permission-denied') {
+        console.error("posts 컬렉션 권한 거부됨 - 관리자 권한 확인 필요");
+        throw new Error("삭제 권한이 없습니다. 관리자 권한을 확인해주세요.");
+      }
     }
     
-    // philosophy 컬렉션에서 시도
-    const philosophyRef = doc(db, "philosophy", postId);
-    await deleteDoc(philosophyRef);
+    // philosophy 컬렉션에서 삭제 시도
+    try {
+      console.log("philosophy 컬렉션에서 삭제 시도...");
+      const philosophyRef = doc(db, "philosophy", postId);
+      await deleteDoc(philosophyRef);
+      console.log("philosophy 컬렉션에서 삭제 성공");
+      philosophyDeleted = true;
+    } catch (philosophyError) {
+      console.error("philosophy 컬렉션 삭제 실패:", philosophyError);
+      
+      // 권한 오류인 경우 더 자세한 정보 제공
+      if (philosophyError.code === 'permission-denied') {
+        console.error("philosophy 컬렉션 권한 거부됨 - 관리자 권한 확인 필요");
+        throw new Error("삭제 권한이 없습니다. 관리자 권한을 확인해주세요.");
+      }
+    }
+    
+    // 삭제 결과 확인
+    if (postsDeleted || philosophyDeleted) {
+      console.log("게시글 삭제 완료 - posts:", postsDeleted, "philosophy:", philosophyDeleted);
+      return;
+    } else {
+      throw new Error("두 컬렉션 모두에서 삭제에 실패했습니다.");
+    }
   } catch (error) {
     console.error("개똥철학 게시글 삭제 오류:", error);
-    throw new Error("개똥철학 게시글 삭제에 실패했습니다.");
+    
+    // 에러 타입에 따른 구체적인 메시지 제공
+    if (error.code === 'permission-denied') {
+      throw new Error("삭제 권한이 없습니다. 관리자 권한을 확인해주세요.");
+    } else if (error.code === 'unavailable') {
+      throw new Error("서비스가 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해주세요.");
+    } else if (error.code === 'not-found') {
+      throw new Error("게시글을 찾을 수 없습니다.");
+    } else {
+      throw new Error("개똥철학 게시글 삭제에 실패했습니다: " + error.message);
+    }
+  }
+};
+
+// 강제 삭제 함수 (관리자용)
+export const forceDeletePhilosophyPost = async (postId) => {
+  try {
+    console.log("강제 삭제 시도:", postId);
+    
+    const deletePromises = [];
+    
+    // posts 컬렉션에서 삭제 시도
+    try {
+      const postsRef = doc(db, "posts", postId);
+      deletePromises.push(deleteDoc(postsRef).then(() => {
+        console.log("posts 컬렉션 강제 삭제 성공");
+        return "posts";
+      }).catch(error => {
+        console.log("posts 컬렉션 강제 삭제 실패:", error.message);
+        return null;
+      }));
+    } catch (error) {
+      console.log("posts 컬렉션 참조 생성 실패:", error.message);
+    }
+    
+    // philosophy 컬렉션에서 삭제 시도
+    try {
+      const philosophyRef = doc(db, "philosophy", postId);
+      deletePromises.push(deleteDoc(philosophyRef).then(() => {
+        console.log("philosophy 컬렉션 강제 삭제 성공");
+        return "philosophy";
+      }).catch(error => {
+        console.log("philosophy 컬렉션 강제 삭제 실패:", error.message);
+        return null;
+      }));
+    } catch (error) {
+      console.log("philosophy 컬렉션 참조 생성 실패:", error.message);
+    }
+    
+    // 모든 삭제 시도 완료 대기
+    const results = await Promise.all(deletePromises);
+    const successfulDeletes = results.filter(result => result !== null);
+    
+    console.log("강제 삭제 결과:", successfulDeletes);
+    
+    if (successfulDeletes.length > 0) {
+      return { success: true, deletedFrom: successfulDeletes };
+    } else {
+      throw new Error("모든 컬렉션에서 삭제에 실패했습니다.");
+    }
+  } catch (error) {
+    console.error("강제 삭제 오류:", error);
+    throw error;
   }
 };
 
@@ -281,7 +371,6 @@ export const incrementViews = async (postId) => {
       });
       return;
     } catch (postsError) {
-      console.log("posts 컬렉션 조회수 증가 실패:", postsError.message);
     }
     
     // philosophy 컬렉션에서 시도
@@ -365,13 +454,12 @@ export const getPhilosophyPostsByUser = async (userId) => {
   try {
     const allPosts = [];
     
-    // 1. posts 컬렉션에서 조회
+    // 1. posts 컬렉션에서 조회 (인덱스 없이 클라이언트에서 정렬)
     try {
       const postsQuery = query(
         collection(db, "posts"),
         where("authorId", "==", userId),
-        where("category", "==", "philosophy"),
-        orderBy("createdAt", "desc")
+        where("category", "==", "philosophy")
       );
       
       const postsSnapshot = await getDocs(postsQuery);
@@ -382,7 +470,6 @@ export const getPhilosophyPostsByUser = async (userId) => {
         });
       });
     } catch (postsError) {
-      console.log("posts 컬렉션 사용자 게시글 조회 실패:", postsError.message);
     }
     
     // 2. philosophy 컬렉션에서 조회
@@ -402,10 +489,9 @@ export const getPhilosophyPostsByUser = async (userId) => {
         });
       });
     } catch (philosophyError) {
-      console.log("philosophy 컬렉션 사용자 게시글 조회 실패:", philosophyError.message);
     }
     
-    // 중복 제거 및 정렬
+    // 중복 제거 및 클라이언트 사이드 정렬 (인덱스 불필요)
     const uniquePosts = allPosts.reduce((acc, post) => {
       const existingPost = acc.find(p => p.id === post.id);
       if (!existingPost) {
@@ -414,6 +500,7 @@ export const getPhilosophyPostsByUser = async (userId) => {
       return acc;
     }, []);
     
+    // 클라이언트 사이드에서 정렬하여 복합 인덱스 요구사항 제거
     uniquePosts.sort((a, b) => {
       const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
       const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
@@ -424,5 +511,99 @@ export const getPhilosophyPostsByUser = async (userId) => {
   } catch (error) {
     console.error("사용자 개똥철학 게시글 조회 오류:", error);
     throw new Error("사용자 개똥철학 게시글을 불러오는데 실패했습니다.");
+  }
+};
+
+// 모든 개똥철학 게시글 조회
+export const getAllPhilosophyPosts = async () => {
+  try {
+    const allPosts = [];
+    
+    // 1. posts 컬렉션에서 조회 (인덱스 없이 모든 데이터 가져온 후 클라이언트에서 필터링)
+    try {
+      const postsQuery = query(
+        collection(db, "posts"),
+        where("category", "==", "philosophy")
+      );
+      
+      const postsSnapshot = await getDocs(postsQuery);
+      postsSnapshot.forEach((doc) => {
+        allPosts.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+    } catch (postsError) {
+    }
+    
+    // 2. philosophy 컬렉션에서 조회
+    try {
+      const philosophyQuery = query(
+        collection(db, "philosophy"),
+        orderBy("createdAt", "desc")
+      );
+      
+      const philosophySnapshot = await getDocs(philosophyQuery);
+      philosophySnapshot.forEach((doc) => {
+        allPosts.push({
+          id: doc.id,
+          ...doc.data(),
+          fromOldCollection: true
+        });
+      });
+    } catch (philosophyError) {
+    }
+
+    // 중복 제거 및 클라이언트 사이드 정렬 (인덱스 불필요)
+    const uniquePosts = allPosts.reduce((acc, post) => {
+      const existingPost = acc.find(p => p.id === post.id);
+      if (!existingPost) {
+        acc.push(post);
+      }
+      return acc;
+    }, []);
+
+    // 클라이언트 사이드에서 정렬하여 복합 인덱스 요구사항 제거
+    uniquePosts.sort((a, b) => {
+      const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+      const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+      return dateB - dateA;
+    });
+
+    // 각 게시글에 대해 작성자 정보를 동적으로 조회
+    for (let i = 0; i < uniquePosts.length; i++) {
+      const post = uniquePosts[i];
+      let authorName = post.author || "익명";
+      
+      // authorId가 있고 author가 "익명"이거나 없으면 사용자 프로필에서 조회
+      if (post.authorId && (!post.author || post.author === "익명")) {
+        try {
+          const userProfile = await getUserProfile(post.authorId);
+          if (userProfile) {
+            authorName = userProfile.nickname || userProfile.name || userProfile.displayName || "익명";
+            // 작성자 정보를 업데이트 (선택적)
+            if (authorName !== "익명") {
+              const collectionName = post.fromOldCollection ? "philosophy" : "posts";
+              updateDoc(doc(db, collectionName, post.id), {
+                author: authorName
+              }).catch(err => console.log("작성자 정보 업데이트 실패:", err));
+            }
+          }
+        } catch (error) {
+          console.log("작성자 정보 조회 실패:", error);
+        }
+      }
+      
+      // 작성자 정보 업데이트
+      uniquePosts[i] = {
+        ...post,
+        author: authorName
+      };
+    }
+
+    return uniquePosts;
+  } catch (error) {
+    console.error("모든 개똥철학 게시글 조회 오류:", error);
+    throw new Error("개똥철학 게시글을 불러오는데 실패했습니다.");
   }
 };

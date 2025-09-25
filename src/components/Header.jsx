@@ -74,86 +74,81 @@ const Header = () => {
 
   if (loading) {
     return (
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <Link to="/" className="flex items-center space-x-2">
-              <img
-                src="/tapgol.png"
-                alt="탑골톡 로고"
-                className="w-8 h-8 object-contain"
-              />
-              <span className="text-lg font-bold text-gray-800">탑골톡</span>
-            </Link>
-            <div className="w-24 h-8 bg-gray-200 rounded animate-pulse"></div>
-          </div>
+      <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-40 safe-area-inset-top">
+        <div className="px-4 py-3 h-14 flex items-center justify-between">
+          <Link to="/" className="flex items-center space-x-2">
+            <img
+              src="/tapgol.png"
+              alt="탑골톡 로고"
+              className="w-6 h-6 object-contain"
+            />
+            <span className="text-lg font-bold text-gray-800">탑골톡</span>
+          </Link>
+          <div className="w-16 h-6 bg-gray-200 rounded animate-pulse"></div>
         </div>
       </header>
     );
   }
 
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200">
-      <div className="max-w-4xl mx-auto px-4 py-3">
-        <div className="flex items-center justify-between">
-          {/* 로고 */}
-          <Link to="/" className="flex items-center space-x-2">
-            <img
-              src="/tapgol.png"
-              alt="탑골톡 로고"
-              className="w-8 h-8 object-contain"
-            />
-            <span className="text-lg font-bold text-gray-800">탑골톡</span>
-          </Link>
+    <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-40 safe-area-inset-top">
+      <div className="px-4 py-3 h-14 flex items-center justify-between">
+        {/* 로고 */}
+        <Link to="/" className="flex items-center space-x-2">
+          <img
+            src="/tapgol.png"
+            alt="탑골톡 로고"
+            className="w-6 h-6 object-contain"
+          />
+          <span className="text-lg font-bold text-gray-800">탑골톡</span>
+        </Link>
 
-          {/* 로그인/내 정보/로그아웃 버튼 */}
-          {user ? (
-            <div className="flex items-center space-x-3">
-              {/* 관리자 패널 링크 */}
-              {isAdmin && (
-                <Link
-                  to="/admin"
-                  className="px-4 py-2 rounded-full bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors flex items-center space-x-2"
-                  title="관리자 패널"
-                >
-                  <span className="text-lg">👑</span>
-                  <span>관리자</span>
-                </Link>
-              )}
-              
+        {/* 모바일 최적화된 액션 버튼들 */}
+        {user ? (
+          <div className="flex items-center space-x-2">
+            {/* 관리자 패널 (아이콘만) */}
+            {isAdmin && (
               <Link
-                to="/profile"
-                className="flex items-center space-x-2 px-4 py-2 rounded-full bg-amber-100 text-amber-900 font-semibold hover:bg-amber-200 transition-colors"
+                to="/admin"
+                className="p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                title="관리자 패널"
               >
-                <div className="w-8 h-8 flex items-center justify-center rounded-full bg-amber-500 text-white text-sm font-bold">
-                  {getUserInitial()}
-                </div>
-                <span className="max-w-24 truncate">{getUserDisplayName()}</span>
+                <span className="text-lg">👑</span>
               </Link>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 rounded-full bg-gray-500 text-white font-semibold hover:bg-gray-600 transition-colors"
-              >
-                로그아웃
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center space-x-3">
-              <Link
-                to="/signup"
-                className="px-4 py-2 rounded-full bg-amber-600 text-white font-semibold hover:bg-amber-700 transition-colors"
-              >
-                회원가입
-              </Link>
-              <Link
-                to="/login"
-                className="px-4 py-2 rounded-full bg-green-500 text-white font-semibold hover:bg-green-600 transition-colors"
-              >
-                로그인
-              </Link>
-            </div>
-          )}
-        </div>
+            )}
+            
+            {/* 프로필 (아이콘만) */}
+            <Link
+              to="/profile"
+              className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+              title={getUserDisplayName()}
+            >
+              <div className="w-7 h-7 flex items-center justify-center rounded-full bg-amber-500 text-white text-xs font-bold">
+                {getUserInitial()}
+              </div>
+            </Link>
+            
+            {/* 로그아웃 (아이콘만) */}
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-full text-gray-600 hover:bg-gray-100 transition-colors"
+              title="로그아웃"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center space-x-2">
+            <Link
+              to="/login"
+              className="px-3 py-1.5 text-sm rounded-full bg-amber-600 text-white font-semibold hover:bg-amber-700 transition-colors"
+            >
+              로그인
+            </Link>
+          </div>
+        )}
       </div>
     </header>
   );

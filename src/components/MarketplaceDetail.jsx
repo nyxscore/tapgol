@@ -184,34 +184,25 @@ const MarketplaceDetail = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
-      <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="min-h-screen bg-white pb-20">
+      <div className="max-w-md mx-auto">
         {/* 헤더 */}
-        <div className={`rounded-lg shadow-md p-6 mb-6 ${
-          isAdmin(post?.authorEmail) 
-            ? getEnhancedAdminStyles().container
-            : 'bg-white'
-        }`}>
-          {isAdmin(post?.authorEmail) && (
-            <>
-              <div className={getEnhancedAdminStyles().glowEffect}></div>
-              <svg className={getEnhancedAdminStyles().adminIcon} fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-            </>
-          )}
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={() => navigate('/marketplace')}
-              className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110"
-              title="목록으로 돌아가기"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-              </svg>
-            </button>
+        <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => navigate('/marketplace')}
+                className="flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
+                title="목록으로 돌아가기"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <h1 className="text-lg font-semibold text-gray-800">상품 상세</h1>
+            </div>
             {user && (post.authorId === user.uid || isCurrentUserAdmin(user)) && (
-              <div className="flex gap-2">
+              <div className="flex gap-1">
                 <button
                   onClick={() => {
                     if (!user || (post.authorId !== user.uid && !isCurrentUserAdmin(user))) {
@@ -220,62 +211,76 @@ const MarketplaceDetail = () => {
                     }
                     navigate(`/marketplace/edit/${id}`);
                   }}
-                  className="flex items-center gap-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm"
+                  className="flex items-center gap-1 px-2 py-1 bg-blue-500 text-white rounded text-xs"
                 >
-                  <FaEdit />
+                  <FaEdit className="w-3 h-3" />
                   수정
                 </button>
                 <button
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="flex items-center gap-2 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-sm"
+                  className="flex items-center gap-1 px-2 py-1 bg-red-500 text-white rounded text-xs"
                 >
-                  <FaTrash />
+                  <FaTrash className="w-3 h-3" />
                   삭제
                 </button>
               </div>
             )}
           </div>
-          
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">{post.title || '제목 없음'}</h1>
-          <p className="text-amber-600 font-bold text-2xl mb-4">{formatPrice(post.price)}</p>
-          
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm mb-4">
-            <div className="flex flex-col">
-              <span className="text-gray-500 text-xs mb-1">위치</span>
-              <span className="text-gray-600">{post.location || '위치 미설정'}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-gray-500 text-xs mb-1">등록일</span>
-              <span className="text-gray-600">{formatDate(post.createdAt)}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-gray-500 text-xs mb-1">조회수</span>
-              <div className="flex items-center space-x-1">
-                <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                  <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                </svg>
-                <span className="text-gray-600">{post.views || 0}</span>
-              </div>
-            </div>
-          </div>
-          
-          {post.category && (
-            <div className="mb-4">
-              <span className="inline-block bg-gray-100 text-gray-600 px-3 py-1 rounded text-sm">
-                {categories.find(c => c.value === post.category)?.label || post.category}
+        </div>
+        {/* 작성자 정보 */}
+        <div className="bg-white border-b border-gray-100 p-4">
+          <div className="flex items-center space-x-3 mb-3">
+            <div className="w-10 h-10 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
+              <span className="text-white font-medium">
+                {(post.author || "익명").charAt(0)}
               </span>
             </div>
-          )}
+            <div className="flex-1">
+              <div className="flex items-center space-x-2">
+                <span 
+                  className="font-medium text-gray-800"
+                  onClick={() => {
+                    navigateToDM(post.authorId, user, navigate);
+                  }}
+                >
+                  {post.author || "익명"}
+                </span>
+                <span className="text-gray-400 text-xs">•</span>
+                <span className="text-gray-400 text-xs">{formatDate(post.createdAt)}</span>
+              </div>
+            </div>
+            {post.sold && (
+              <span className="bg-red-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
+                판매완료
+              </span>
+            )}
+          </div>
+
+          {/* 상품 정보 */}
+          <div className="mb-3">
+            <h1 className="text-lg font-semibold text-gray-800 mb-1">{post.title || '제목 없음'}</h1>
+            <p className="text-amber-600 font-bold text-xl mb-2">{formatPrice(post.price)}</p>
+            <p className="text-gray-600 text-sm">{post.location || '위치 미설정'}</p>
+            {post.category && (
+              <span className="inline-block bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs mt-2">
+                {categories.find(c => c.value === post.category)?.label || post.category}
+              </span>
+            )}
+          </div>
+
+          {/* 하단 통계 */}
+          <div className="flex items-center justify-between text-gray-500 text-xs">
+            <div className="flex items-center space-x-4">
+              <span>{post.views || 0} 조회</span>
+              <span>{post.likes || 0} 좋아요</span>
+              <span>{post.commentCount || 0} 댓글</span>
+            </div>
+          </div>
         </div>
 
         {/* 이미지 갤러리 */}
         {post.images && post.images.length > 0 && (
-          <div className={`rounded-lg shadow-md p-6 mb-6 ${
-            isAdmin(post?.authorEmail) 
-              ? 'bg-gradient-to-br from-purple-50 via-pink-50 to-purple-100 border-l-4 border-purple-500' 
-              : 'bg-white'
-          }`}>
+          <div className="bg-white">
             <div className="relative">
               <div className="aspect-video bg-gray-200 rounded-lg overflow-hidden relative">
                 {!imageError[currentImageIndex] ? (
@@ -328,41 +333,53 @@ const MarketplaceDetail = () => {
         )}
 
         {/* 상품 설명 */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">상품 설명</h2>
+        <div className="bg-white border-b border-gray-100 p-4">
+          <h2 className="text-base font-semibold text-gray-800 mb-3">상품 설명</h2>
           <div className="prose max-w-none">
-            <p className="text-gray-700 whitespace-pre-wrap">
+            <p className="text-gray-700 whitespace-pre-wrap text-sm leading-relaxed">
               {post.description || '상품 설명이 없습니다.'}
             </p>
           </div>
           {/* 판매자 1:1 문의 버튼 */}
-          {user && user.uid !== post.authorId && (
-            <div className="mt-6">
+          <div className="mt-4">
+            {!user ? (
+              <button
+                onClick={() => {
+                  alert('로그인이 필요합니다.');
+                  navigate('/login');
+                }}
+                className="w-full px-4 py-3 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition-colors text-sm"
+              >
+                로그인 후 1:1 문의
+              </button>
+            ) : user.uid === post.authorId ? (
+              <div className="text-center py-2">
+                <span className="text-gray-500 text-sm">본인이 작성한 게시글입니다</span>
+              </div>
+            ) : (
               <button
                 onClick={() => navigateToDM(post.authorId, user, navigate)}
-                className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
               >
                 판매자 1:1 문의
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-
-        
 
         {/* 판매 상태 변경 */}
         {user && post.authorId === user.uid && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="bg-white border-b border-gray-100 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-gray-800 mb-2">판매 상태</h2>
-                <p className="text-gray-600">
+                <h2 className="text-base font-semibold text-gray-800 mb-1">판매 상태</h2>
+                <p className="text-gray-600 text-sm">
                   현재 상태: {post.sold ? '판매완료' : '판매중'}
                 </p>
               </div>
               <button
                 onClick={handleMarkAsSold}
-                className={`px-6 py-2 rounded transition-colors ${
+                className={`px-4 py-2 rounded text-sm transition-colors ${
                   post.sold
                     ? 'bg-blue-500 text-white hover:bg-blue-600'
                     : 'bg-red-500 text-white hover:bg-red-600'

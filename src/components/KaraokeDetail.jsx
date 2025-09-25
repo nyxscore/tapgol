@@ -13,11 +13,106 @@ import { FaFlag } from 'react-icons/fa';
 import { formatAdminName, isAdmin, getEnhancedAdminStyles, isCurrentUserAdmin } from '../util/adminUtils';
 
 const normalizeStorageUrl = (url) => {
+  if (!url || typeof url !== 'string') return null;
+  
+  try {
+    // 메인 페이지와 동일한 URL 정규화 로직
+    const fixAll = (s, from, to) => (s || '').split(from).join(to);
+    let fixed = url;
+    fixed = fixAll(fixed, 'tabgol-4f728.firebasestorage.app', 'tabgol-4f728.appspot.com');
+    fixed = fixAll(fixed, 'b/tabgol-4f728.firebasestorage.app', 'b/tabgol-4f728.appspot.com');
+    fixed = fixAll(fixed, 'https://firebasestorage.app', 'https://firebasestorage.googleapis.com');
+
+    const urlObj = new URL(fixed);
+    if (!urlObj.hostname.includes('firebasestorage.googleapis.com')) {
+      console.warn('잘못된 Firebase Storage URL:', url);
+      return null;
+    }
+    return fixed;
+  } catch (error) {
+    console.warn('URL 정규화 실패:', url, error);
+    return null;
+  }
+};
+
+// 썸네일 URL 정규화 (썸네일 전용)
+const normalizeThumbnailUrl = (url) => {
   if (!url || typeof url !== 'string') return url;
-  let fixed = url;
-  fixed = fixed.replace('b/tabgol-4f728.firebasestorage.app', 'b/tabgol-4f728.appspot.com');
-  fixed = fixed.replace('https://firebasestorage.app', 'https://firebasestorage.googleapis.com');
-  return fixed;
+  
+  // 썸네일 URL이 유효한지 확인
+  if (url.includes('karaoke_thumbs') || url.includes('thumbnail')) {
+    return normalizeStorageUrl(url);
+  }
+  
+  return url;
+};
+
+// 비디오 URL 유효성 검사
+const validateVideoUrl = async (url) => {
+  if (!url) return false;
+  
+  try {
+    const normalizedUrl = normalizeStorageUrl(url);
+    if (!normalizedUrl) return false;
+    
+    // HEAD 요청으로 파일 존재 여부 확인
+    const response = await fetch(normalizedUrl, { method: 'HEAD' });
+    return response.ok;
+  } catch (error) {
+    console.warn('비디오 URL 유효성 검사 실패:', url, error);
+    return false;
+  }
+};
+
+// 대체 URL 생성 함수 (메인 페이지와 동일한 방식)
+const getAlternativeUrls = (originalUrl) => {
+  const normalized = normalizeStorageUrl(originalUrl);
+  const urls = [];
+  
+  // 정규화된 URL이 있으면 우선 사용
+  if (normalized) {
+    urls.push(normalized);
+  }
+  
+  // 원본 URL이 정규화된 것과 다르면 원본도 추가
+  if (originalUrl !== normalized && originalUrl) {
+    urls.unshift(originalUrl);
+  }
+  
+  // 추가 대체 URL들 시도 (메인 페이지와 동일한 방식)
+  if (originalUrl && originalUrl.includes('firebasestorage.googleapis.com')) {
+    const altUrl = originalUrl.replace('firebasestorage.googleapis.com', 'firebasestorage.app');
+    if (!urls.includes(altUrl)) {
+      urls.push(altUrl);
+    }
+  }
+  
+  // 반대 방향도 시도
+  if (originalUrl && originalUrl.includes('firebasestorage.app')) {
+    const altUrl = originalUrl.replace('firebasestorage.app', 'firebasestorage.googleapis.com');
+    if (!urls.includes(altUrl)) {
+      urls.push(altUrl);
+    }
+  }
+  
+  console.log('대체 URL 생성:', { originalUrl, normalized, urls });
+  return urls;
+};
+
+// 비디오 파일 존재 여부 확인 (CORS 문제로 인해 비활성화)
+const checkVideoFileExists = async (url) => {
+  // Firebase Storage의 CORS 정책으로 인해 HEAD 요청이 실패할 수 있음
+  // 실제 파일 존재 여부는 비디오 로딩 시 onError에서 확인
+  console.log(`비디오 파일 확인 시도: ${url}`);
+  return true; // 항상 true 반환하여 비디오 로딩을 시도하게 함
+};
+
+// 썸네일 파일 존재 여부 확인 (CORS 문제로 인해 비활성화)
+const checkThumbnailExists = async (url) => {
+  // Firebase Storage의 CORS 정책으로 인해 HEAD 요청이 실패할 수 있음
+  // 실제 파일 존재 여부는 썸네일 로딩 시 onError에서 확인
+  console.log(`썸네일 파일 확인 시도: ${url}`);
+  return true; // 항상 true 반환하여 썸네일 로딩을 시도하게 함
 };
 
 const KaraokeDetail = () => {
@@ -36,6 +131,12 @@ const KaraokeDetail = () => {
 
   // 신고 관련 상태
   const [showReportModal, setShowReportModal] = useState(false);
+  const [videoError, setVideoError] = useState(null);
+  const [videoLoading, setVideoLoading] = useState(true);
+  const [currentVideoUrl, setCurrentVideoUrl] = useState(null);
+  const [alternativeUrls, setAlternativeUrls] = useState([]);
+  const [urlIndex, setUrlIndex] = useState(0);
+  const [thumbnailError, setThumbnailError] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -56,6 +157,8 @@ const KaraokeDetail = () => {
         try {
           videoElement.pause();
           videoElement.currentTime = 0;
+          videoElement.src = '';
+          videoElement.load();
         } catch (error) {
           // AbortError는 무시
           if (error.name !== 'AbortError') {
@@ -73,6 +176,25 @@ const KaraokeDetail = () => {
       
       const postData = await getKaraokePost(id);
       setPost(postData);
+      
+      // 비디오 URL 설정 및 파일 존재 여부 확인
+      if (postData.videoUrl) {
+        const urls = getAlternativeUrls(postData.videoUrl);
+        setAlternativeUrls(urls);
+        setCurrentVideoUrl(urls[0]);
+        setUrlIndex(0);
+        
+        console.log('비디오 URL 설정 완료:', {
+          originalUrl: postData.videoUrl,
+          normalizedUrl: urls[0],
+          allUrls: urls
+        });
+      }
+      
+      // 썸네일 URL 설정
+      if (postData.thumbnailUrl) {
+        console.log('썸네일 URL 설정 완료:', postData.thumbnailUrl);
+      }
       
       // 조회수 증가 (로그인한 사용자만)
       if (user) {
@@ -247,48 +369,234 @@ const KaraokeDetail = () => {
               ? 'bg-gradient-to-br from-purple-50 via-pink-50 to-purple-100 border-l-4 border-purple-500' 
               : 'bg-white'
           }`}>
-            <div className="aspect-video bg-black">
+            <div className="aspect-video bg-black relative">
               <video
-                src={normalizeStorageUrl(post.videoUrl)}
+                src={currentVideoUrl}
                 controls
-                preload="metadata"
-                poster={normalizeStorageUrl(post.thumbnailUrl) || ""}
-                crossOrigin="anonymous"
+                preload="auto"
+                poster={post.thumbnailUrl ? normalizeThumbnailUrl(post.thumbnailUrl) : ""}
                 controlsList="nodownload"
+                playsInline
                 onError={(e) => {
+                  // 썸네일 로딩 실패 감지
+                  if (e.target.tagName === 'IMG' && e.target.src.includes('thumbnail')) {
+                    console.warn('썸네일 로딩 실패:', e.target.src);
+                    setThumbnailError(true);
+                    return;
+                  }
+                  
                   try {
                     const el = e.currentTarget;
-                    console.log(`비디오 로딩 실패: ${post.videoUrl}`);
+                    const error = el.error;
+                    const errorInfo = {
+                      errorCode: error?.code,
+                      errorMessage: error?.message,
+                      networkState: el.networkState,
+                      readyState: el.readyState,
+                      src: el.src,
+                      currentSrc: el.currentSrc,
+                      is404: el.src.includes('404') || error?.code === 4 || error?.code === 2 || 
+                             (error?.code === 4 && el.networkState === 3) // MEDIA_ERR_SRC_NOT_SUPPORTED + NETWORK_NO_SOURCE
+                    };
+                    
+                    console.error('비디오 로딩 실패:', {
+                      currentUrl: currentVideoUrl,
+                      originalUrl: post?.videoUrl,
+                      errorInfo
+                    });
+                    
+                    // 404 에러인 경우 대체 URL 시도하지 않고 바로 에러 표시
+                    if (errorInfo.is404) {
+                      console.log('404 에러 감지 - 파일이 존재하지 않음');
+                      setVideoError({
+                        ...errorInfo,
+                        isFileNotFound: true,
+                        message: '비디오 파일을 찾을 수 없습니다. 파일이 삭제되었거나 이동되었을 수 있습니다.'
+                      });
+                      setVideoLoading(false);
+                      el.style.display = 'none';
+                      const placeholder = el.parentElement.querySelector('.video-placeholder');
+                      if (placeholder) {
+                        placeholder.style.display = 'flex';
+                      }
+                      return;
+                    }
+                    
+                    // 대체 URL이 있으면 다음 URL 시도
+                    if (urlIndex < alternativeUrls.length - 1) {
+                      const nextIndex = urlIndex + 1;
+                      const nextUrl = alternativeUrls[nextIndex];
+                      console.log(`대체 URL 시도: ${nextUrl} (${nextIndex + 1}/${alternativeUrls.length})`);
+                      setUrlIndex(nextIndex);
+                      setCurrentVideoUrl(nextUrl);
+                      setVideoLoading(true);
+                      setVideoError(null);
+                      return;
+                    }
+                    
+                    // 모든 URL 시도 실패
+                    setVideoError(errorInfo);
+                    setVideoLoading(false);
+                    
                     // 파일이 존재하지 않는 경우 placeholder 표시
                     el.style.display = 'none';
                     const placeholder = el.parentElement.querySelector('.video-placeholder');
                     if (placeholder) {
                       placeholder.style.display = 'flex';
                     }
-                  } catch {}
+                  } catch (err) {
+                    console.error('비디오 에러 핸들링 중 오류:', err);
+                  }
+                }}
+                onLoadStart={() => {
+                  console.log('비디오 로딩 시작:', currentVideoUrl);
+                  setVideoLoading(true);
+                  setVideoError(null);
+                }}
+                onCanPlay={() => {
+                  console.log('비디오 재생 가능:', currentVideoUrl);
+                  setVideoLoading(false);
+                  setVideoError(null);
+                  
+                  // 비디오가 성공적으로 로드되면 placeholder 숨기기
+                  const placeholder = document.querySelector('.video-placeholder');
+                  if (placeholder) {
+                    placeholder.style.display = 'none';
+                  }
+                }}
+                onLoadedData={() => {
+                  console.log('비디오 데이터 로드 완료:', currentVideoUrl);
+                  setVideoLoading(false);
                 }}
                 className="w-full h-full object-contain"
                 onLoadedMetadata={(e) => {
-                  // 동영상 메타데이터 로드 후 첫 번째 프레임을 썸네일로 사용
-                  const video = e.target;
-                  const canvas = document.createElement('canvas');
-                  canvas.width = video.videoWidth;
-                  canvas.height = video.videoHeight;
-                  const ctx = canvas.getContext('2d');
-                  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                  if (!post.thumbnailUrl) {
-                    video.poster = canvas.toDataURL();
+                  try {
+                    // 동영상 메타데이터 로드 후 첫 번째 프레임을 썸네일로 사용
+                    const video = e.target;
+                    if (video.videoWidth > 0 && video.videoHeight > 0) {
+                      const canvas = document.createElement('canvas');
+                      canvas.width = video.videoWidth;
+                      canvas.height = video.videoHeight;
+                      const ctx = canvas.getContext('2d');
+                      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                      if (!post.thumbnailUrl || thumbnailError) {
+                        video.poster = canvas.toDataURL();
+                        console.log('비디오에서 썸네일 생성 완료');
+                      }
+                    }
+                  } catch (err) {
+                    console.warn('썸네일 생성 실패:', err);
                   }
                 }}
               >
+                <source src={currentVideoUrl} type={post.fileType || "video/mp4"} />
                 브라우저가 비디오 태그를 지원하지 않습니다.
               </video>
+              {/* 비디오 로딩 중 표시 */}
+              {videoLoading && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                  <div className="text-center text-white">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                    <div className="text-lg font-medium">비디오 로딩 중...</div>
+                    {alternativeUrls.length > 1 && (
+                      <div className="text-sm text-gray-300 mt-2">
+                        URL {urlIndex + 1}/{alternativeUrls.length} 시도 중
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
               {/* 비디오 로딩 실패 시 표시할 placeholder */}
               <div className="video-placeholder absolute inset-0 bg-gray-300 flex items-center justify-center text-gray-600" style={{display: 'none'}}>
                 <div className="text-center">
                   <div className="text-6xl mb-4">🎬</div>
-                  <div className="text-lg font-medium">비디오를 불러올 수 없습니다</div>
-                  <div className="text-sm text-gray-500 mt-2">파일이 삭제되었거나 이동되었을 수 있습니다</div>
+                  <div className="text-lg font-medium">
+                    {videoError?.isFileNotFound ? '비디오 파일을 찾을 수 없습니다' : '비디오를 불러올 수 없습니다'}
+                  </div>
+                  <div className="text-sm text-gray-500 mt-2">
+                    {videoError?.isFileNotFound 
+                      ? '파일이 삭제되었거나 이동되었을 수 있습니다. 관리자에게 문의하세요.'
+                      : '네트워크 문제이거나 파일에 문제가 있을 수 있습니다'
+                    }
+                  </div>
+                  
+                  {/* 디버깅 정보 표시 */}
+                  {videoError && (
+                    <div className="mt-4 p-3 bg-gray-100 rounded text-xs text-left max-w-md">
+                      <div className="font-semibold mb-2">디버깅 정보:</div>
+                      <div>에러 코드: {videoError.errorCode}</div>
+                      <div>네트워크 상태: {videoError.networkState}</div>
+                      <div>준비 상태: {videoError.readyState}</div>
+                      <div className="break-all">현재 URL: {videoError.src}</div>
+                      <div className="break-all">원본 URL: {post.videoUrl}</div>
+                      <div>시도한 URL 수: {urlIndex + 1}/{alternativeUrls.length}</div>
+                    </div>
+                  )}
+                  
+                  <div className="flex space-x-2 mt-4">
+                    <button 
+                      onClick={() => {
+                        const video = document.querySelector('video');
+                        if (video) {
+                          video.load();
+                          video.style.display = 'block';
+                          const placeholder = document.querySelector('.video-placeholder');
+                          if (placeholder) {
+                            placeholder.style.display = 'none';
+                          }
+                          setVideoError(null);
+                          setVideoLoading(true);
+                        }
+                      }}
+                      className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+                    >
+                      다시 시도
+                    </button>
+                    
+                    {alternativeUrls.length > 1 && !videoError?.isFileNotFound && (
+                      <button 
+                        onClick={() => {
+                          const nextIndex = (urlIndex + 1) % alternativeUrls.length;
+                          setUrlIndex(nextIndex);
+                          setCurrentVideoUrl(alternativeUrls[nextIndex]);
+                          setVideoError(null);
+                          setVideoLoading(true);
+                          const video = document.querySelector('video');
+                          if (video) {
+                            video.style.display = 'block';
+                            const placeholder = document.querySelector('.video-placeholder');
+                            if (placeholder) {
+                              placeholder.style.display = 'none';
+                            }
+                          }
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        다른 URL 시도
+                      </button>
+                    )}
+                    
+                    {videoError?.isFileNotFound && user && (post.authorId === user.uid || isCurrentUserAdmin(user)) && (
+                      <button 
+                        onClick={async () => {
+                          if (window.confirm('이 비디오 게시글을 삭제하시겠습니까? 파일이 존재하지 않습니다.')) {
+                            try {
+                              await deleteKaraokePost(id, post.fileName);
+                              alert('삭제된 비디오 게시글이 정리되었습니다.');
+                              navigate("/karaoke");
+                            } catch (error) {
+                              console.error('게시글 삭제 오류:', error);
+                              alert('게시글 삭제에 실패했습니다.');
+                            }
+                          }
+                        }}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                      >
+                        삭제된 게시글 정리
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

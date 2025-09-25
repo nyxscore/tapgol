@@ -11,8 +11,8 @@ const GalleryUpload = () => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [preview, setPreview] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [previews, setPreviews] = useState([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -37,52 +37,56 @@ const GalleryUpload = () => {
   }, [navigate]);
 
   const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
 
     // 파일 타입 검증 - 이미지만 허용
     const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    
-    if (!allowedImageTypes.includes(file.type)) {
-      alert("지원하지 않는 파일 형식입니다.\n\n이미지만 업로드 가능합니다: JPG, PNG, GIF, WEBP");
-      return;
-    }
-
-    // 파일 크기 제한 (50MB)
     const maxSize = 50 * 1024 * 1024; // 50MB
-    if (file.size > maxSize) {
-      alert("파일 크기는 50MB를 초과할 수 없습니다.");
-      return;
-    }
+    
+    const validFiles = [];
+    const newPreviews = [];
+    
+    files.forEach((file, index) => {
+      if (!allowedImageTypes.includes(file.type)) {
+        alert(`파일 ${index + 1}: 지원하지 않는 파일 형식입니다.\n\n이미지만 업로드 가능합니다: JPG, PNG, GIF, WEBP`);
+        return;
+      }
 
-    setSelectedFile(file);
+      if (file.size > maxSize) {
+        alert(`파일 ${index + 1}: 파일 크기는 50MB를 초과할 수 없습니다.`);
+        return;
+      }
 
-    // 미리보기 생성
-    if (file.type.startsWith('image/')) {
+      validFiles.push(file);
+      
+      // 이미지 미리보기 생성
       const reader = new FileReader();
       reader.onload = (e) => {
-        setPreview(e.target.result);
+        newPreviews.push(e.target.result);
+        if (newPreviews.length === validFiles.length) {
+          setPreviews([...previews, ...newPreviews]);
+        }
       };
       reader.readAsDataURL(file);
-    } else if (file.type.startsWith('video/')) {
-      const video = document.createElement('video');
-      video.onloadedmetadata = () => {
-        // 동영상의 첫 번째 프레임을 캡처하여 썸네일 생성
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        setPreview(canvas.toDataURL());
-      };
-      video.src = URL.createObjectURL(file);
+    });
+
+    if (validFiles.length > 0) {
+      setSelectedFiles([...selectedFiles, ...validFiles]);
     }
+  };
+
+  const handleRemoveImage = (index) => {
+    const newFiles = selectedFiles.filter((_, i) => i !== index);
+    const newPreviews = previews.filter((_, i) => i !== index);
+    setSelectedFiles(newFiles);
+    setPreviews(newPreviews);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!selectedFile) {
+    if (selectedFiles.length === 0) {
       alert("파일을 선택해주세요.");
       return;
     }
@@ -96,27 +100,39 @@ const GalleryUpload = () => {
     setUploadProgress(0);
 
     try {
-      // 파일 업로드
-      const uploadResult = await uploadFile(selectedFile, user.uid);
+      // 여러 파일 업로드
+      const uploadResults = [];
       
-      // 갤러리 항목 생성
-      const galleryData = {
-        title: title.trim(),
-        description: description.trim(),
-        fileUrl: uploadResult.url,
-        fileName: uploadResult.fileName,
-        originalName: uploadResult.originalName,
-        fileSize: uploadResult.size,
-        fileType: uploadResult.type,
-        fileTypeCategory: getFileType(uploadResult.type),
-        uploaderId: user.uid,
-        uploader: userData?.nickname || userData?.name || user?.displayName || "익명",
-        uploaderEmail: user.email
-      };
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        const uploadResult = await uploadFile(file, user.uid);
+        uploadResults.push(uploadResult);
+        
+        // 업로드 진행률 업데이트
+        const progress = ((i + 1) / selectedFiles.length) * 100;
+        setUploadProgress(progress);
+      }
+      
+      // 각 이미지에 대해 갤러리 항목 생성
+      for (const uploadResult of uploadResults) {
+        const galleryData = {
+          title: title.trim(),
+          description: description.trim(),
+          fileUrl: uploadResult.url,
+          fileName: uploadResult.fileName,
+          originalName: uploadResult.originalName,
+          fileSize: uploadResult.size,
+          fileType: uploadResult.type,
+          fileTypeCategory: getFileType(uploadResult.type),
+          uploaderId: user.uid,
+          uploader: userData?.nickname || userData?.name || user?.displayName || "익명",
+          uploaderEmail: user.email
+        };
 
-      await createGalleryItem(galleryData);
+        await createGalleryItem(galleryData);
+      }
       
-      alert("업로드가 완료되었습니다!");
+      alert(`업로드가 완료되었습니다! (${selectedFiles.length}개 파일)`);
       navigate("/gallery");
     } catch (error) {
       console.error("업로드 오류:", error);
@@ -136,13 +152,6 @@ const GalleryUpload = () => {
     navigate("/gallery");
   };
 
-  const clearFile = () => {
-    setSelectedFile(null);
-    setPreview(null);
-    if (preview && preview.startsWith('blob:')) {
-      URL.revokeObjectURL(preview);
-    }
-  };
 
   if (loading) {
     return (
@@ -187,6 +196,7 @@ const GalleryUpload = () => {
                 <input
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={handleFileSelect}
                   className="hidden"
                   id="file-upload"
@@ -202,12 +212,12 @@ const GalleryUpload = () => {
                     </svg>
                     <div className="text-gray-600">
                       <span className="font-medium text-amber-600 hover:text-amber-500">
-                        파일을 클릭하여 선택
+                        파일을 클릭하여 선택 (여러 개 선택 가능)
                       </span>
                       <p className="text-xs">또는 드래그 앤 드롭</p>
                     </div>
                     <p className="text-xs text-gray-500">
-                      이미지: JPG, PNG, GIF, WEBP (최대 50MB)
+                      이미지: JPG, PNG, GIF, WEBP (최대 50MB, 여러 개 선택 가능)
                     </p>
                   </div>
                 </label>
@@ -215,51 +225,54 @@ const GalleryUpload = () => {
             </div>
 
             {/* 파일 미리보기 */}
-            {selectedFile && (
+            {selectedFiles.length > 0 && (
               <div className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium text-gray-700">선택된 파일</h3>
+                  <h3 className="text-sm font-medium text-gray-700">
+                    선택된 파일 ({selectedFiles.length}개)
+                  </h3>
                   <button
                     type="button"
-                    onClick={clearFile}
+                    onClick={() => {
+                      setSelectedFiles([]);
+                      setPreviews([]);
+                    }}
                     className="text-red-600 hover:text-red-700 text-sm"
                     disabled={uploading}
                   >
-                    제거
+                    모두 제거
                   </button>
                 </div>
-                <div className="flex items-center space-x-4">
-                  {preview && (
-                    <div className="flex-shrink-0 relative">
-                      {selectedFile.type.startsWith('image/') ? (
-                        <img
-                          src={preview}
-                          alt="미리보기"
-                          className="w-20 h-20 object-cover rounded-lg"
-                        />
-                      ) : (
-                        <div className="relative">
+                <div className="space-y-3">
+                  {selectedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center space-x-3">
+                      {previews[index] && (
+                        <div className="flex-shrink-0 relative">
                           <img
-                            src={preview}
-                            alt="동영상 썸네일"
-                            className="w-20 h-20 object-cover rounded-lg"
+                            src={previews[index]}
+                            alt={`미리보기 ${index + 1}`}
+                            className="w-16 h-16 object-cover rounded-lg border border-gray-200"
                           />
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="bg-black bg-opacity-50 rounded-full p-1">
-                              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                              </svg>
-                            </div>
-                          </div>
                         </div>
                       )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {file.name}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {(file.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(index)}
+                        className="text-red-600 hover:text-red-700 text-sm"
+                        disabled={uploading}
+                      >
+                        제거
+                      </button>
                     </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {selectedFile.name}
-                    </p>
-                  </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -335,9 +348,9 @@ const GalleryUpload = () => {
               </button>
               <button
                 type="submit"
-                disabled={uploading || !selectedFile || !title.trim()}
+                disabled={uploading || selectedFiles.length === 0 || !title.trim()}
                 className={`px-6 py-2 rounded-lg transition-colors ${
-                  uploading || !selectedFile || !title.trim()
+                  uploading || selectedFiles.length === 0 || !title.trim()
                     ? 'bg-gray-400 text-white cursor-not-allowed'
                     : 'bg-amber-600 text-white hover:bg-amber-700'
                 }`}

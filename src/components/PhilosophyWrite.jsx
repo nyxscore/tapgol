@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { createPhilosophyPost } from "../util/philosophyService";
+import { getCurrentUserProfile } from "../util/userService";
 
 const PhilosophyWrite = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [userData, setUserData] = useState(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -19,6 +21,15 @@ const PhilosophyWrite = () => {
         return;
       }
       setUser(currentUser);
+      
+      // 사용자 프로필 정보 가져오기
+      if (currentUser) {
+        getCurrentUserProfile().then(profile => {
+          setUserData(profile);
+        }).catch(error => {
+          console.error('사용자 프로필 로드 오류:', error);
+        });
+      }
     });
 
     return () => unsubscribe();
@@ -43,7 +54,7 @@ const PhilosophyWrite = () => {
       const postData = {
         title: title.trim(),
         content: content.trim(),
-        author: user?.displayName || user?.email,
+        author: userData?.nickname || userData?.name || user?.displayName || user?.email || "익명",
         authorId: user.uid
       };
       

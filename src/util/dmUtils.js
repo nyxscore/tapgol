@@ -7,21 +7,27 @@
  * @param {function} navigate - React Router의 navigate 함수
  */
 export const navigateToDM = (targetUserId, currentUser, navigate) => {
+  console.log('navigateToDM 호출:', { targetUserId, currentUser: currentUser?.uid });
+  
   if (!targetUserId) {
     console.warn("대상 사용자 ID가 없습니다.");
+    alert("대화할 사용자를 찾을 수 없습니다.");
     return;
   }
 
   if (!currentUser) {
+    console.warn("현재 사용자 정보가 없습니다.");
     alert("1:1 채팅을 하려면 로그인이 필요합니다.");
     return;
   }
 
   if (targetUserId === currentUser.uid) {
+    console.warn("자기 자신과의 채팅 시도");
     alert("자기 자신과는 1:1 채팅을 할 수 없습니다.");
     return;
   }
 
+  console.log('1:1 채팅방으로 이동:', `/chat/dm/${targetUserId}`);
   navigate(`/chat/dm/${targetUserId}`);
 };
 

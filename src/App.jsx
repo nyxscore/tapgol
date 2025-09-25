@@ -50,13 +50,14 @@ const AdminPanel = lazy(() => import("./components/AdminPanel"));
 // 메인 레이아웃 컴포넌트
 function MainLayout() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
+    <div className="min-h-screen bg-gray-50">
       {/* 헤더를 공통으로 표시 */}
       <Header />
-      {/* 네비와 겹치지 않게 공통 하단 여백 */}
-      <div className="pb-20">
+      {/* 메인 콘텐츠 영역 */}
+      <main className="min-h-screen">
         <Outlet />
-      </div>
+      </main>
+      {/* 하단 네비게이션 */}
       <BottomNavigation />
     </div>
   );
@@ -109,6 +110,7 @@ export default function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/profile/:userId" element={<Profile />} />
               </Route>
             </Routes>
           </Suspense>

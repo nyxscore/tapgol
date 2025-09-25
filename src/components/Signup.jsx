@@ -6,7 +6,7 @@ import { auth, db } from "../util/firebase";
 
 const Signup = () => {
   const [form, setForm] = useState({
-    email: "",
+    username: "",
     password: "",
     passwordConfirm: "",
     phone: "",
@@ -75,14 +75,15 @@ const Signup = () => {
   const validateForm = () => {
     const errors = {};
 
-    // 이메일 검증
-    if (!form.email.trim()) {
-      errors.email = "이메일을 입력해주세요.";
-    } else {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(form.email)) {
-        errors.email = "올바른 이메일 형식을 입력해주세요.";
-      }
+    // 아이디 검증
+    if (!form.username.trim()) {
+      errors.username = "아이디를 입력해주세요.";
+    } else if (form.username.length < 3) {
+      errors.username = "아이디는 3자 이상이어야 합니다.";
+    } else if (form.username.length > 20) {
+      errors.username = "아이디는 20자 이하여야 합니다.";
+    } else if (!/^[a-zA-Z0-9_]+$/.test(form.username)) {
+      errors.username = "아이디는 영문, 숫자, 언더스코어(_)만 사용할 수 있습니다.";
     }
 
     // 비밀번호 검증
@@ -137,16 +138,17 @@ const Signup = () => {
     }
 
     try {
-      // Firebase에 사용자 계정 생성
+      // Firebase에 사용자 계정 생성 (아이디를 이메일 형식으로 변환)
+      const emailFormat = `${form.username}@tapgol.local`;
       const userCredential = await createUserWithEmailAndPassword(
         auth,
-        form.email,
+        emailFormat,
         form.password
       );
 
       // 사용자 프로필 업데이트
       await updateProfile(userCredential.user, {
-        displayName: form.name || form.nickname || form.email.split('@')[0],
+        displayName: form.name || form.nickname || form.username,
         photoURL: null
       });
 
@@ -154,8 +156,9 @@ const Signup = () => {
       const userData = {
         name: form.name || null,
         nickname: form.nickname,
+        username: form.username,
         phone: form.phone || null,
-        email: form.email,
+        email: emailFormat,
         birthDate: form.birthDate || null,
         gender: form.gender || null,
         address: form.address || null,
@@ -167,9 +170,9 @@ const Signup = () => {
         updatedAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
         // 추가 메타데이터
-        signupMethod: "email",
+        signupMethod: "username",
         emailVerified: false,
-        profileComplete: true // 기본정보(이메일, 별명, 비밀번호)가 모두 필수이므로 항상 완성된 상태
+        profileComplete: true // 기본정보(아이디, 별명, 비밀번호)가 모두 필수이므로 항상 완성된 상태
       };
 
       await setDoc(doc(db, "users", userCredential.user.uid), userData);
@@ -189,7 +192,7 @@ const Signup = () => {
       
       switch (error.code) {
         case "auth/email-already-in-use":
-          errorMessage = "이미 사용 중인 이메일입니다. 다른 이메일을 선택해주세요.";
+          errorMessage = "이미 사용 중인 아이디입니다. 다른 아이디를 선택해주세요.";
           errorType = "warning";
           break;
         case "auth/weak-password":
@@ -197,11 +200,11 @@ const Signup = () => {
           errorType = "error";
           break;
         case "auth/invalid-email":
-          errorMessage = "유효하지 않은 이메일 형식입니다. 이메일 형식을 확인해주세요.";
+          errorMessage = "유효하지 않은 아이디 형식입니다. 아이디 형식을 확인해주세요.";
           errorType = "error";
           break;
         case "auth/operation-not-allowed":
-          errorMessage = "이메일/비밀번호 회원가입이 비활성화되어 있습니다.";
+          errorMessage = "아이디/비밀번호 회원가입이 비활성화되어 있습니다.";
           errorType = "error";
           break;
         case "auth/network-request-failed":
@@ -242,7 +245,8 @@ const Signup = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8 mt-8">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 pb-20">
+      <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8 mt-20">
       <h2 className="text-3xl font-bold text-amber-700 mb-6 text-center">
         탑골공원 회원가입
       </h2>
@@ -274,20 +278,20 @@ const Signup = () => {
           <h3 className="text-xl font-semibold text-gray-800 mb-4">기본 정보</h3>
           
           <div>
-            <label className="block text-lg font-semibold mb-2" htmlFor="email">
-              이메일 *
+            <label className="block text-lg font-semibold mb-2" htmlFor="username">
+              아이디 *
             </label>
             <input
-              type="email"
-              id="email"
-              name="email"
-              value={form.email}
+              type="text"
+              id="username"
+              name="username"
+              value={form.username}
               onChange={handleChange}
-              className={`w-full border rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-amber-400 ${getFieldErrorStyle("email")}`}
+              className={`w-full border rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-amber-400 ${getFieldErrorStyle("username")}`}
               required
-              placeholder="example@gmail.com"
+              placeholder="아이디를 입력하세요 (3-20자, 영문, 숫자, _만 사용)"
             />
-            {fieldErrors.email && <p className="text-sm text-red-500 mt-1">{fieldErrors.email}</p>}
+            {fieldErrors.username && <p className="text-sm text-red-500 mt-1">{fieldErrors.username}</p>}
           </div>
 
           <div className="mt-4">
@@ -491,6 +495,7 @@ const Signup = () => {
           )}
         </button>
       </form>
+      </div>
     </div>
   );
 };

@@ -3,6 +3,7 @@ import {
   query, where, orderBy, limit, serverTimestamp, increment 
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { getUserProfile } from "./userService";
 
 // 건강정보 게시글 작성
 export const createHealthPost = async (postData) => {
@@ -202,5 +203,53 @@ export const getHealthPostsByCategory = async (category) => {
   } catch (error) {
     console.error("카테고리별 건강정보 게시글 조회 오류:", error);
     throw new Error("카테고리별 게시글을 불러오는데 실패했습니다.");
+  }
+};
+
+// 모든 건강정보 게시글 조회
+export const getAllHealthPosts = async () => {
+  try {
+    const q = query(
+      collection(db, "healthPosts"),
+      orderBy("createdAt", "desc")
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const posts = [];
+    
+    // 각 게시글에 대해 작성자 정보를 동적으로 조회
+    for (const docSnapshot of querySnapshot.docs) {
+      const postData = docSnapshot.data();
+      let authorName = postData.author || "익명";
+      
+      // authorId가 있고 author가 "익명"이거나 없으면 사용자 프로필에서 조회
+      if (postData.authorId && (!postData.author || postData.author === "익명")) {
+        try {
+          const userProfile = await getUserProfile(postData.authorId);
+          if (userProfile) {
+            authorName = userProfile.nickname || userProfile.name || userProfile.displayName || "익명";
+            // 작성자 정보를 업데이트 (선택적)
+            if (authorName !== "익명") {
+              updateDoc(doc(db, "healthPosts", docSnapshot.id), {
+                author: authorName
+              }).catch(err => console.log("작성자 정보 업데이트 실패:", err));
+            }
+          }
+        } catch (error) {
+          console.log("작성자 정보 조회 실패:", error);
+        }
+      }
+      
+      posts.push({
+        id: docSnapshot.id,
+        ...postData,
+        author: authorName
+      });
+    }
+    
+    return posts;
+  } catch (error) {
+    console.error("모든 건강정보 게시글 조회 오류:", error);
+    throw new Error("건강정보 게시글을 불러오는데 실패했습니다.");
   }
 };

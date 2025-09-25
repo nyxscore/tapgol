@@ -9,11 +9,12 @@ import {
   query, 
   where, 
   orderBy, 
-  limit,
+  limit, 
   serverTimestamp,
   increment
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { getUserProfile } from "./userService";
 
 // 데이터 검증 함수
 const validatePostData = (postData) => {
@@ -469,5 +470,92 @@ export const getMarketplacePostsByPriceRange = async (minPrice, maxPrice, limitC
   } catch (error) {
     console.error("가격 범위별 게시글 조회 오류:", error);
     throw new Error("가격 범위별 게시글을 불러오는데 실패했습니다.");
+  }
+};
+
+// 모든 중고장터 게시글 조회
+export const getAllMarketplacePosts = async () => {
+  try {
+    const q = query(
+      collection(db, "marketplace"),
+      orderBy("createdAt", "desc")
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const posts = [];
+    
+    // 각 게시글에 대해 작성자 정보를 동적으로 조회
+    for (const docSnapshot of querySnapshot.docs) {
+      const postData = docSnapshot.data();
+      let authorName = postData.author || "익명";
+      
+      // authorId가 있고 author가 "익명"이거나 없으면 사용자 프로필에서 조회
+      if (postData.authorId && (!postData.author || postData.author === "익명")) {
+        try {
+          const userProfile = await getUserProfile(postData.authorId);
+          if (userProfile) {
+            authorName = userProfile.nickname || userProfile.name || userProfile.displayName || "익명";
+            // 작성자 정보를 업데이트 (선택적)
+            if (authorName !== "익명") {
+              updateDoc(doc(db, "marketplace", docSnapshot.id), {
+                author: authorName
+              }).catch(err => console.log("작성자 정보 업데이트 실패:", err));
+            }
+          }
+        } catch (error) {
+          console.log("작성자 정보 조회 실패:", error);
+        }
+      }
+      
+      posts.push({
+        id: docSnapshot.id,
+        ...postData,
+        author: authorName
+      });
+    }
+    
+    return posts;
+  } catch (error) {
+    console.error("모든 중고장터 게시글 조회 오류:", error);
+    throw new Error("중고장터 게시글을 불러오는데 실패했습니다.");
+  }
+};
+
+// 좋아요 토글
+export const toggleLike = async (postId, userId) => {
+  try {
+    const postRef = doc(db, "marketplace", postId);
+    const postSnap = await getDoc(postRef);
+    
+    if (!postSnap.exists()) {
+      throw new Error("게시글을 찾을 수 없습니다.");
+    }
+    
+    const postData = postSnap.data();
+    const likedBy = postData.likedBy || [];
+    const isLiked = likedBy.includes(userId);
+    
+    if (isLiked) {
+      // 좋아요 취소
+      const newLikedBy = likedBy.filter(id => id !== userId);
+      await updateDoc(postRef, {
+        likes: Math.max(0, postData.likes - 1),
+        likedBy: newLikedBy,
+        updatedAt: serverTimestamp()
+      });
+      return false;
+    } else {
+      // 좋아요 추가
+      const newLikedBy = [...likedBy, userId];
+      await updateDoc(postRef, {
+        likes: (postData.likes || 0) + 1,
+        likedBy: newLikedBy,
+        updatedAt: serverTimestamp()
+      });
+      return true;
+    }
+  } catch (error) {
+    console.error("좋아요 토글 오류:", error);
+    throw new Error("좋아요 처리에 실패했습니다.");
   }
 };

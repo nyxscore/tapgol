@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { getKaraokePosts, toggleLike, incrementViews, uploadKaraokeThumbnail, updateKaraokePost } from "../util/karaokeService";
 import UserProfileModal from './UserProfileModal';
@@ -15,6 +15,10 @@ const Karaoke = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [loadingVideos, setLoadingVideos] = useState(new Set()); // 로딩 중인 비디오들
+  const [playingVideos, setPlayingVideos] = useState(new Set()); // 재생 중인 비디오들
+  const videoRefs = useRef({}); // 각 비디오 엘리먼트 참조
 
   // 프로필 모달 관련 상태
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -25,7 +29,11 @@ const Karaoke = () => {
 
     // 개발자 도구에서 정리 함수 사용 가능하도록 설정
     window.cleanupKaraoke = cleanupInvalidKaraokePosts;
+    
+
   }, []);
+
+
 
   const loadKaraokePosts = async () => {
     try {
@@ -36,34 +44,18 @@ const Karaoke = () => {
       // 비디오 URL이 있는 게시글만 표시
       const videoOnly = Array.isArray(postsData) ? postsData.filter((p) => !!p.videoUrl) : [];
       
-      // 비디오 파일 존재 여부 확인 (비동기)
-      const validPosts = [];
-      const invalidPosts = [];
-      
-      for (const post of videoOnly) {
-        try {
-          if (post.videoFileName) {
-            const videoRef = ref(storage, `karaoke/${post.videoFileName}`);
-            await getDownloadURL(videoRef);
-            validPosts.push(post);
-          } else {
-            // 파일명이 없는 경우는 일단 유효한 것으로 간주
-            validPosts.push(post);
-          }
-        } catch (error) {
-          if (error.code === 'storage/object-not-found') {
-            invalidPosts.push(post);
-            console.log(`무효한 비디오 게시물 발견: ${post.id} - ${post.title || '제목 없음'}`);
-          } else {
-            // 다른 오류는 일단 유효한 것으로 간주
-            validPosts.push(post);
-          }
-        }
-      }
-      
-      if (invalidPosts.length > 0) {
-        console.log(`${invalidPosts.length}개의 무효한 비디오 게시물이 필터링되었습니다.`);
-      }
+      // 비디오 URL 유효성 검사 (비동기)
+      // 상세페이지와 동일한 방식: 대체 URL 생성
+      const validPosts = videoOnly.map(post => {
+        const alternativeUrls = getAlternativeUrls(post.videoUrl);
+        return {
+          ...post,
+          videoUrl: alternativeUrls[0], // 첫 번째 URL 사용
+          alternativeUrls: alternativeUrls // 모든 대체 URL 저장
+        };
+      });
+
+      // 모든 비디오를 표시 (상세페이지와 동일한 방식)
       
       setPosts(validPosts);
 
@@ -83,15 +75,63 @@ const Karaoke = () => {
       setLoading(false);
     }
   };
-  // Storage URL 정규화 (잘못 저장된 버킷/도메인 보정)
+
+  // 무효한 게시물 제거 함수
+  const removeInvalidPost = (postId) => {
+    setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
+    setStatusMessage(prev => prev.replace(/\d+개/, (match) => {
+      const current = parseInt(match);
+      return `${current - 1}개`;
+    }));
+  };
+
+  // Storage URL 정규화 및 유효성 검사 (개선된 버전)
   const normalizeStorageUrl = (url) => {
-    if (!url || typeof url !== 'string') return url;
-    const fixAll = (s, from, to) => (s || '').split(from).join(to);
-    let fixed = url;
-    fixed = fixAll(fixed, 'tabgol-4f728.firebasestorage.app', 'tabgol-4f728.appspot.com');
-    fixed = fixAll(fixed, 'b/tabgol-4f728.firebasestorage.app', 'b/tabgol-4f728.appspot.com');
-    fixed = fixAll(fixed, 'https://firebasestorage.app', 'https://firebasestorage.googleapis.com');
-    return fixed;
+    if (!url || typeof url !== 'string') return null;
+    
+    try {
+      // 잘못된 경로 패턴 수정
+      let fixed = url;
+      
+      // tabgol-4f728.firebasestorage.app을 tabgol-4f728.appspot.com으로 변경
+      fixed = fixed.replace(/tabgol-4f728\.firebasestorage\.app/g, 'tabgol-4f728.appspot.com');
+      
+      // firebasestorage.app 도메인을 firebasestorage.googleapis.com으로 변경
+      fixed = fixed.replace('firebasestorage.app', 'firebasestorage.googleapis.com');
+      
+      // URL 형식 검증
+      const urlObj = new URL(fixed);
+      if (urlObj.hostname.includes('firebasestorage.googleapis.com')) {
+        return fixed;
+      }
+      
+      console.warn('URL 검증 실패:', fixed);
+      return null;
+    } catch (error) {
+      console.warn('URL 정규화 실패:', url, error);
+      return null;
+    }
+  };
+
+  // 대체 URL 생성 함수 (개선된 버전)
+  const getAlternativeUrls = (originalUrl) => {
+    const normalized = normalizeStorageUrl(originalUrl);
+    const urls = [];
+    
+    // 정규화된 URL이 있으면 우선 사용 (가장 안전한 URL)
+    if (normalized) {
+      urls.push(normalized);
+    }
+    
+    // 원본 URL이 유효하고 정규화된 것과 다르면 추가
+    if (originalUrl && originalUrl !== normalized && originalUrl.includes('firebasestorage.googleapis.com')) {
+      urls.push(originalUrl);
+    }
+    
+    // firebasestorage.app 도메인은 CORS 문제로 인해 제외
+    // 잘못된 URL 생성을 방지하기 위해 원본 URL만 사용
+    
+    return urls.length > 0 ? urls : [originalUrl]; // fallback
   };
 
   // 기존 게시글 썸네일 생성 및 저장
@@ -270,7 +310,19 @@ const Karaoke = () => {
                 <span>업로드</span>
               </button>
             </div>
-                           <p className="text-gray-600">비디오를 공유하고 소통해보세요</p>
+            <p className="text-gray-600">비디오를 공유하고 소통해보세요</p>
+            
+            {/* 상태 메시지 표시 */}
+            {statusMessage && (
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-blue-800 text-sm">{statusMessage}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {posts.length === 0 ? (
@@ -290,77 +342,133 @@ const Karaoke = () => {
               {posts.map((post) => (
                 <div
                   key={post.id}
-                  onClick={() => handlePostClick(post.id)}
                   className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transform transition-transform hover:scale-105 hover:shadow-lg"
                 >
-                  <div className="relative">
+                  <div className="relative cursor-pointer" onClick={() => handlePostClick(post.id)}>
                     <div className="w-full h-48 bg-gray-200 flex items-center justify-center relative overflow-hidden">
                       <video
-                        src={normalizeStorageUrl(post.videoUrl)}
+                        ref={(el) => {
+                          if (el) {
+                            videoRefs.current[post.id] = el;
+                          }
+                        }}
+                        data-video-id={post.id}
+                        src={post.videoUrl}
                         className="w-full h-full object-cover"
                         muted
+                        loop
+                        playsInline
                         preload="metadata"
-                        poster={normalizeStorageUrl(post.thumbnailUrl) || ""}
-                        crossOrigin="anonymous"
+                        poster={post.thumbnailUrl || ""}
                         onError={(e) => {
-                          try {
-                            const el = e.currentTarget;
-                            console.log(`비디오 로딩 실패: ${post.videoUrl}`);
-                            // 파일이 존재하지 않는 경우 placeholder 표시
-                            el.style.display = 'none';
-                            const placeholder = el.parentElement.querySelector('.video-placeholder');
-                            if (placeholder) {
-                              placeholder.style.display = 'flex';
-                            }
-                          } catch {}
-                        }}
-                        onLoadedMetadata={(e) => {
-                          // 동영상 메타데이터 로드 후 첫 번째 프레임을 썸네일로 사용
                           const video = e.target;
-                          const canvas = document.createElement('canvas');
-                          canvas.width = video.videoWidth;
-                          canvas.height = video.videoHeight;
-                          const ctx = canvas.getContext('2d');
-                          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                          if (!post.thumbnailUrl) {
-                            video.style.backgroundImage = `url(${canvas.toDataURL()})`;
+                          const currentIndex = video.dataset.urlIndex || 0;
+                          const alternativeUrls = post.alternativeUrls || [post.videoUrl];
+                          
+                          setLoadingVideos(prev => {
+                            const newSet = new Set(prev);
+                            newSet.delete(post.id);
+                            return newSet;
+                          });
+                          
+                          // 대체 URL이 있으면 시도
+                          if (currentIndex < alternativeUrls.length - 1) {
+                            const nextIndex = parseInt(currentIndex) + 1;
+                            video.dataset.urlIndex = nextIndex;
+                            video.src = alternativeUrls[nextIndex];
+                          } else {
+                            // 모든 URL 시도 실패 시 게시물 제거
+                            console.warn(`비디오 파일을 찾을 수 없습니다. 게시물 제거: ${post.id} - ${post.title}`);
+                            removeInvalidPost(post.id);
                           }
-                          video.style.backgroundSize = 'cover';
-                          video.style.backgroundPosition = 'center';
                         }}
-                        onMouseOver={async (e) => {
-                          try {
-                            await e.target.play();
-                          } catch (error) {
-                            // AbortError는 무시 (사용자가 빠르게 마우스를 움직일 때 발생)
-                            if (error.name !== 'AbortError') {
-                              console.error('비디오 재생 오류:', error);
-                            }
-                          }
+                        onLoadStart={() => {
+                          setLoadingVideos(prev => new Set(prev).add(post.id));
                         }}
-                        onMouseOut={(e) => {
-                          try {
-                            e.target.pause();
-                            e.target.currentTime = 0;
-                          } catch (error) {
-                            console.error('비디오 일시정지 오류:', error);
-                          }
+                        onCanPlay={(e) => {
+                          const video = e.target;
+                          setLoadingVideos(prev => {
+                            const newSet = new Set(prev);
+                            newSet.delete(post.id);
+                            return newSet;
+                          });
+                        }}
+                        onPlay={() => {
+                          setPlayingVideos(prev => new Set(prev).add(post.id));
+                        }}
+                        onPause={() => {
+                          setPlayingVideos(prev => {
+                            const newSet = new Set(prev);
+                            newSet.delete(post.id);
+                            return newSet;
+                          });
                         }}
                       />
                       {/* 비디오 로딩 실패 시 표시할 placeholder */}
-                      <div className="video-placeholder absolute inset-0 bg-gray-300 flex items-center justify-center text-gray-600" style={{display: 'none'}}>
-                        <div className="text-center">
+                      <div className="video-placeholder absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center text-gray-600" style={{display: 'none'}}>
+                        <div className="text-center p-4">
                           <div className="text-4xl mb-2">🎬</div>
-                          <div className="text-sm">비디오를 불러올 수 없습니다</div>
+                          <div className="text-sm font-medium mb-1">비디오를 불러올 수 없습니다</div>
+                          <div className="text-xs text-gray-500 mb-3">
+                            파일이 삭제되었거나<br/>
+                            네트워크 문제일 수 있습니다
+                          </div>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.location.reload();
+                            }}
+                            className="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors"
+                          >
+                            새로고침
+                          </button>
                         </div>
                       </div>
-                      <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
-                        <div className="bg-white bg-opacity-20 rounded-full p-3 backdrop-blur-sm">
-                          <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                          </svg>
+                      {/* 재생/정지 버튼 오버레이 */}
+                      <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${playingVideos.has(post.id) ? 'opacity-0 hover:opacity-100' : 'opacity-60 hover:opacity-100'}`}>
+                        <div 
+                          className="bg-black bg-opacity-50 rounded-full p-4 backdrop-blur-sm cursor-pointer hover:bg-opacity-70 transition-all duration-200"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const video = videoRefs.current[post.id];
+                            if (video) {
+                              if (video.paused) {
+                                video.play().catch(console.error);
+                              } else {
+                                video.pause();
+                              }
+                            }
+                          }}
+                        >
+                          {/* 재생 아이콘 */}
+                          {!playingVideos.has(post.id) && (
+                            <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                          {/* 정지 아이콘 */}
+                          {playingVideos.has(post.id) && (
+                            <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1zm4 0a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                          )}
                         </div>
                       </div>
+                      
+                      {/* 클릭 안내 텍스트 */}
+                      <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded opacity-0 hover:opacity-100 transition-opacity duration-200">
+                        {playingVideos.has(post.id) ? '클릭하여 정지' : '클릭하여 재생'}
+                      </div>
+                      
+                      
+                      {/* 로딩 인디케이터 */}
+                      {loadingVideos.has(post.id) && (
+                        <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full flex items-center space-x-1">
+                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>로딩중</span>
+                        </div>
+                      )}
+                      
                       <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded flex items-center space-x-1">
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
@@ -376,9 +484,19 @@ const Karaoke = () => {
                     </div>
                   </div>
                   <div className="p-4">
-                    <h3 className="font-semibold text-gray-800 mb-2 line-clamp-2">{post.title}</h3>
+                    <h3 
+                      className="font-semibold text-gray-800 mb-2 line-clamp-2 cursor-pointer hover:text-blue-600 transition-colors"
+                      onClick={() => handlePostClick(post.id)}
+                    >
+                      {post.title}
+                    </h3>
                     {post.description && (
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">{post.description}</p>
+                      <p 
+                        className="text-sm text-gray-600 mb-3 line-clamp-2 cursor-pointer hover:text-blue-600 transition-colors"
+                        onClick={() => handlePostClick(post.id)}
+                      >
+                        {post.description}
+                      </p>
                     )}
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
                       <div className="flex flex-col">

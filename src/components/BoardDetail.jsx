@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { auth } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getPost, incrementViews, deletePost, toggleLike } from "../util/postService";
@@ -14,6 +14,8 @@ import { formatAdminName, isAdmin, getEnhancedAdminStyles, isCurrentUserAdmin } 
 const BoardDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const commentSectionRef = useRef(null);
   const [post, setPost] = useState(null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -26,6 +28,18 @@ const BoardDetail = () => {
 
   // 신고 관련 상태
   const [showReportModal, setShowReportModal] = useState(false);
+
+  // URL 파라미터에서 댓글 섹션으로 스크롤하는 기능
+  useEffect(() => {
+    if (location.search.includes('scrollTo=comments') && commentSectionRef.current) {
+      setTimeout(() => {
+        commentSectionRef.current?.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }, 500); // 페이지 로딩 후 스크롤
+    }
+  }, [location.search, post]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -250,6 +264,8 @@ const BoardDetail = () => {
                   <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
                     post.category === "정기모임" 
                       ? "bg-red-500 text-white" 
+                      : post.category === "벙개모임"
+                      ? "bg-purple-500 text-white"
                       : "bg-amber-100 text-amber-800"
                   }`}>
                     {post.category || "정기모임"}
@@ -407,7 +423,7 @@ const BoardDetail = () => {
         </div>
 
         {/* 댓글 섹션 */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mt-6">
+        <div ref={commentSectionRef} className="bg-white rounded-2xl shadow-xl p-6 mt-6">
           <CommentSection postId={id} />
         </div>
       </div>

@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, connectFirestoreEmulator, enableNetwork, disableNetwork, initializeFirestore } from "firebase/firestore";
+import { getFirestore, connectFirestoreEmulator, enableNetwork, disableNetwork, initializeFirestore, doc, getDoc } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
@@ -63,5 +63,48 @@ const storage = getStorage(app);
 console.log("Firebase Storage 초기화 성공");
 
 console.log("Firebase 모든 서비스 초기화 완료");
+
+// Firebase 연결 상태 확인 및 재연결 함수
+export const checkFirebaseConnection = async () => {
+  try {
+    // 실제 존재하는 컬렉션으로 연결 상태 확인 (권한이 있는 컬렉션 사용)
+    const testRef = doc(db, "posts", "connection-test");
+    await getDoc(testRef);
+    console.log("Firebase 연결 상태: 정상");
+    return true;
+  } catch (error) {
+    // 권한 오류는 연결이 정상이지만 해당 문서에 접근 권한이 없는 경우
+    if (error.code === 'permission-denied' || error.code === 'not-found') {
+      console.log("Firebase 연결 상태: 정상 (권한/문서 없음)");
+      return true;
+    }
+    console.error("Firebase 연결 상태: 오류", error);
+    return false;
+  }
+};
+
+// Firebase 재연결 시도 함수
+export const reconnectFirebase = async () => {
+  try {
+    console.log("Firebase 재연결 시도...");
+    
+    // 네트워크 재연결 시도
+    await enableNetwork(db);
+    console.log("Firebase 네트워크 재연결 성공");
+    
+    // 연결 상태 재확인
+    const isConnected = await checkFirebaseConnection();
+    if (isConnected) {
+      console.log("Firebase 재연결 완료");
+      return true;
+    } else {
+      console.error("Firebase 재연결 실패");
+      return false;
+    }
+  } catch (error) {
+    console.error("Firebase 재연결 오류:", error);
+    return false;
+  }
+};
 
 export { auth, app, db, storage };

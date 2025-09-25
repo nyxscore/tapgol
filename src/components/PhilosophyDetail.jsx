@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { auth, db } from "../util/firebase";
+import { auth, db, checkFirebaseConnection, reconnectFirebase } from "../util/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { getPhilosophyPost, deletePhilosophyPost, toggleLike, incrementViews } from "../util/philosophyService";
+import { getPhilosophyPost, deletePhilosophyPost, forceDeletePhilosophyPost, toggleLike, incrementViews } from "../util/philosophyService";
 import { formatTextWithLinks } from "../util/textUtils.jsx";
 import CommentSection from "./CommentSection";
 import UserProfileModal from "./UserProfileModal";
@@ -60,7 +60,16 @@ const PhilosophyDetail = () => {
   };
 
   const handleDelete = async () => {
-    if (!user || (user.uid !== post.authorId && !isCurrentUserAdmin(user))) {
+    console.log("삭제 시도 - 사용자:", user);
+    console.log("삭제 시도 - 게시글 작성자:", post?.authorId);
+    console.log("삭제 시도 - 관리자 여부:", isCurrentUserAdmin(user));
+    
+    if (!user) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+    
+    if (user.uid !== post.authorId && !isCurrentUserAdmin(user)) {
       alert("삭제 권한이 없습니다.");
       return;
     }
@@ -70,12 +79,33 @@ const PhilosophyDetail = () => {
     }
 
     try {
+      console.log("게시글 삭제 시작:", id);
+      
+      // 직접 삭제 시도 (연결 상태 확인은 삭제 함수 내부에서 처리)
       await deletePhilosophyPost(id);
       alert("게시글이 삭제되었습니다.");
       navigate("/philosophy");
     } catch (error) {
       console.error("삭제 오류:", error);
-      alert("삭제에 실패했습니다.");
+      
+      // 권한 오류인 경우 재연결 시도
+      if (error.message.includes("권한") || error.message.includes("permission")) {
+        console.log("권한 오류 감지, 재연결 시도...");
+        try {
+          await reconnectFirebase();
+          // 재연결 후 다시 삭제 시도
+          await deletePhilosophyPost(id);
+          alert("게시글이 삭제되었습니다.");
+          navigate("/philosophy");
+          return;
+        } catch (retryError) {
+          console.error("재시도 삭제 오류:", retryError);
+          alert("삭제에 실패했습니다: " + retryError.message);
+          return;
+        }
+      }
+      
+      alert("삭제에 실패했습니다: " + error.message);
     }
   };
 
@@ -85,6 +115,27 @@ const PhilosophyDetail = () => {
       return;
     }
     navigate(`/philosophy/edit/${id}`);
+  };
+
+  const handleForceDelete = async () => {
+    if (!isCurrentUserAdmin(user)) {
+      alert("관리자만 강제 삭제할 수 있습니다.");
+      return;
+    }
+
+    if (!window.confirm("정말로 이 글을 강제 삭제하시겠습니까? (모든 컬렉션에서 삭제)")) {
+      return;
+    }
+
+    try {
+      console.log("강제 삭제 시작:", id);
+      const result = await forceDeletePhilosophyPost(id);
+      alert(`게시글이 강제 삭제되었습니다. 삭제된 컬렉션: ${result.deletedFrom.join(', ')}`);
+      navigate("/philosophy");
+    } catch (error) {
+      console.error("강제 삭제 오류:", error);
+      alert("강제 삭제에 실패했습니다: " + error.message);
+    }
   };
 
   const handleLike = async () => {
@@ -343,7 +394,16 @@ const PhilosophyDetail = () => {
               </div>
 
               {/* 작성자만 수정/삭제 버튼 표시 */}
-              {user && (user.uid === post.authorId || isCurrentUserAdmin(user)) && (
+              {(() => {
+                const canEditDelete = user && (user.uid === post.authorId || isCurrentUserAdmin(user));
+                console.log("삭제 버튼 표시 조건:", {
+                  user: !!user,
+                  isAuthor: user?.uid === post.authorId,
+                  isAdmin: isCurrentUserAdmin(user),
+                  canEditDelete
+                });
+                return canEditDelete;
+              })() && (
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={handleEdit}
@@ -357,6 +417,15 @@ const PhilosophyDetail = () => {
                   >
                     삭제
                   </button>
+                  {isCurrentUserAdmin(user) && (
+                    <button
+                      onClick={handleForceDelete}
+                      className="px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 transition-colors"
+                      title="모든 컬렉션에서 강제 삭제"
+                    >
+                      강제삭제
+                    </button>
+                  )}
                 </div>
               )}
             </div>

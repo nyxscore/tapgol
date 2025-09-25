@@ -39,13 +39,31 @@ const validateUserAuth = async () => {
   }
 };
 
-// 사용자 정보 조회
+// 사용자 정보 조회 (다른 사용자 프로필 조회용 - 로그인 불필요)
 export const getUserProfile = async (userId) => {
+  try {
+    const userDoc = await getDoc(doc(db, "users", userId));
+    if (userDoc.exists()) {
+      const data = userDoc.data();
+      return { id: userDoc.id, ...migrateUserData(data) };
+    } else {
+      // 사용자 데이터가 없으면 null 반환 (기본 데이터 생성하지 않음)
+      return null;
+    }
+  } catch (error) {
+    console.error("사용자 정보 조회 오류:", error);
+    throw error;
+  }
+};
+
+// 본인 프로필 조회 (로그인 필요)
+export const getCurrentUserProfile = async () => {
   try {
     // 인증 상태 확인
     await validateUserAuth();
     
-    const userDoc = await getDoc(doc(db, "users", userId));
+    const currentUser = auth.currentUser;
+    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
     if (userDoc.exists()) {
       const data = userDoc.data();
       return { id: userDoc.id, ...migrateUserData(data) };
@@ -72,11 +90,11 @@ export const getUserProfile = async (userId) => {
       };
       
       // 기본 데이터를 Firestore에 저장
-      await setDoc(doc(db, "users", userId), defaultData);
-      return { id: userId, ...defaultData };
+      await setDoc(doc(db, "users", currentUser.uid), defaultData);
+      return { id: currentUser.uid, ...defaultData };
     }
   } catch (error) {
-    console.error("사용자 정보 조회 오류:", error);
+    console.error("본인 프로필 조회 오류:", error);
     throw error;
   }
 };

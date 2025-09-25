@@ -21,16 +21,16 @@ import {
   listAll 
 } from "firebase/storage";
 import { db, storage } from "./firebase";
+import { getUserProfile } from "./userService";
 
 // 파일 업로드
 export const uploadFile = async (file, userId) => {
   try {
-    // 파일 타입 검증
+    // 파일 타입 검증 - 이미지만 허용
     const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'];
     
-    if (!allowedImageTypes.includes(file.type) && !allowedVideoTypes.includes(file.type)) {
-      throw new Error("지원하지 않는 파일 형식입니다. (이미지: JPG, PNG, GIF, WEBP / 동영상: MP4, WEBM, OGG, MOV)");
+    if (!allowedImageTypes.includes(file.type)) {
+      throw new Error("지원하지 않는 파일 형식입니다. 이미지만 업로드 가능합니다: JPG, PNG, GIF, WEBP");
     }
 
     // 파일 크기 제한 (50MB)
@@ -96,17 +96,88 @@ export const getGalleryItems = async (limitCount = 20) => {
     const querySnapshot = await getDocs(q);
     const items = [];
     
-    querySnapshot.forEach((doc) => {
+    // 각 갤러리 아이템에 대해 작성자 정보를 동적으로 조회
+    for (const docSnapshot of querySnapshot.docs) {
+      const itemData = docSnapshot.data();
+      let uploaderName = itemData.uploader || "익명";
+      
+      // uploaderId가 있고 uploader가 "익명"이거나 없으면 사용자 프로필에서 조회
+      if (itemData.uploaderId && (!itemData.uploader || itemData.uploader === "익명")) {
+        try {
+          const userProfile = await getUserProfile(itemData.uploaderId);
+          if (userProfile) {
+            uploaderName = userProfile.nickname || userProfile.name || userProfile.displayName || "익명";
+            // 작성자 정보를 업데이트 (선택적)
+            if (uploaderName !== "익명") {
+              updateDoc(doc(db, "gallery", docSnapshot.id), {
+                uploader: uploaderName
+              }).catch(err => console.log("작성자 정보 업데이트 실패:", err));
+            }
+          }
+        } catch (error) {
+          console.log("작성자 정보 조회 실패:", error);
+        }
+      }
+      
       items.push({
-        id: doc.id,
-        ...doc.data()
+        id: docSnapshot.id,
+        ...itemData,
+        uploader: uploaderName
       });
-    });
+    }
     
     return items;
   } catch (error) {
     console.error("추억앨범 목록 조회 오류:", error);
     throw new Error("추억앨범 목록을 불러오는데 실패했습니다.");
+  }
+};
+
+// 모든 갤러리 아이템 조회 (제한 없음)
+export const getAllGalleryItems = async () => {
+  try {
+    const q = query(
+      collection(db, "gallery"),
+      orderBy("createdAt", "desc")
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const items = [];
+    
+    // 각 갤러리 아이템에 대해 작성자 정보를 동적으로 조회
+    for (const docSnapshot of querySnapshot.docs) {
+      const itemData = docSnapshot.data();
+      let uploaderName = itemData.uploader || "익명";
+      
+      // uploaderId가 있고 uploader가 "익명"이거나 없으면 사용자 프로필에서 조회
+      if (itemData.uploaderId && (!itemData.uploader || itemData.uploader === "익명")) {
+        try {
+          const userProfile = await getUserProfile(itemData.uploaderId);
+          if (userProfile) {
+            uploaderName = userProfile.nickname || userProfile.name || userProfile.displayName || "익명";
+            // 작성자 정보를 업데이트 (선택적)
+            if (uploaderName !== "익명") {
+              updateDoc(doc(db, "gallery", docSnapshot.id), {
+                uploader: uploaderName
+              }).catch(err => console.log("작성자 정보 업데이트 실패:", err));
+            }
+          }
+        } catch (error) {
+          console.log("작성자 정보 조회 실패:", error);
+        }
+      }
+      
+      items.push({
+        id: docSnapshot.id,
+        ...itemData,
+        uploader: uploaderName
+      });
+    }
+    
+    return items;
+  } catch (error) {
+    console.error("모든 갤러리 아이템 조회 오류:", error);
+    throw new Error("갤러리 아이템을 불러오는데 실패했습니다.");
   }
 };
 
@@ -273,12 +344,10 @@ export const getGalleryItemsByUser = async (userId) => {
   }
 };
 
-// 파일 타입 확인
+// 파일 타입 확인 - 이미지만 처리
 export const getFileType = (fileType) => {
   if (fileType.startsWith('image/')) {
     return 'image';
-  } else if (fileType.startsWith('video/')) {
-    return 'video';
   }
   return 'unknown';
 };

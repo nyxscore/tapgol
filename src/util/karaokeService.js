@@ -92,6 +92,31 @@ export const getKaraokePosts = async (limitCount = 20) => {
   }
 };
 
+// 모든 노래자랑 게시글 조회 (제한 없음)
+export const getAllKaraokePosts = async () => {
+  try {
+    const q = query(
+      collection(db, "karaokePosts"),
+      orderBy("createdAt", "desc")
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const posts = [];
+    
+    querySnapshot.forEach((doc) => {
+      posts.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+    
+    return posts;
+  } catch (error) {
+    console.error("모든 노래자랑 게시글 조회 오류:", error);
+    throw new Error("게시글을 불러오는데 실패했습니다.");
+  }
+};
+
 // 특정 노래자랑 게시글 조회
 export const getKaraokePost = async (postId) => {
   try {

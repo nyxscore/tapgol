@@ -16,6 +16,7 @@ const KaraokeUpload = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState('');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -88,46 +89,136 @@ const KaraokeUpload = () => {
 
     setUploading(true);
     setUploadProgress(0);
+    setUploadStatus('비디오 업로드 중...');
     
     try {
       // 비디오 업로드
+      setUploadStatus('비디오 파일 업로드 중...');
       const uploadResult = await uploadKaraokeVideo(selectedFile, user.uid);
+      setUploadProgress(50);
       
-      // 썸네일 생성 및 업로드
+      // 썸네일 생성 및 업로드 (필수)
+      setUploadStatus('썸네일 생성 중...');
+      console.log('썸네일 생성 시작...');
       let thumbUpload = null;
-      try {
-        const capture = await new Promise((resolve, reject) => {
-          const video = document.createElement('video');
-          video.src = URL.createObjectURL(selectedFile);
-          video.preload = 'metadata';
-          video.muted = true;
-          video.playsInline = true;
-          video.addEventListener('loadeddata', async () => {
-            try {
-              video.currentTime = Math.min(3, video.duration || 3);
-              const onSeeked = async () => {
-                const canvas = document.createElement('canvas');
-                const maxW = 640;
-                const scale = Math.min(1, maxW / video.videoWidth || 1);
-                canvas.width = Math.max(1, Math.floor((video.videoWidth || 640) * scale));
-                canvas.height = Math.max(1, Math.floor((video.videoHeight || 360) * scale));
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                canvas.toBlob((blob) => {
-                  if (blob) resolve(blob); else reject(new Error('썸네일 블롭 생성 실패'));
-                }, 'image/jpeg', 0.85);
-              };
-              video.addEventListener('seeked', onSeeked, { once: true });
-            } catch (err) { reject(err); }
-          }, { once: true });
-          video.onerror = reject;
-        });
-        thumbUpload = await uploadKaraokeThumbnail(capture, user.uid);
-      } catch (thumbErr) {
-        console.warn('썸네일 생성/업로드 실패(무시 가능):', thumbErr);
+      
+      // 썸네일 생성 재시도 로직
+      const createThumbnail = async (retryCount = 0) => {
+        const maxRetries = 3;
+        
+        try {
+          const capture = await new Promise((resolve, reject) => {
+            const video = document.createElement('video');
+            video.src = URL.createObjectURL(selectedFile);
+            video.preload = 'metadata';
+            video.muted = true;
+            video.playsInline = true;
+            video.crossOrigin = 'anonymous';
+            
+            // 타임아웃 설정 (10초)
+            const timeout = setTimeout(() => {
+              reject(new Error('썸네일 생성 타임아웃'));
+            }, 10000);
+            
+            video.addEventListener('loadeddata', async () => {
+              try {
+                clearTimeout(timeout);
+                
+                // 비디오 길이 확인
+                if (!video.duration || video.duration < 1) {
+                  reject(new Error('비디오 길이가 너무 짧습니다'));
+                  return;
+                }
+                
+                // 3초 지점 또는 비디오 길이의 10% 지점에서 썸네일 생성
+                const seekTime = Math.min(3, video.duration * 0.1);
+                video.currentTime = seekTime;
+                
+                const onSeeked = async () => {
+                  try {
+                    const canvas = document.createElement('canvas');
+                    const maxW = 640;
+                    const maxH = 360;
+                    
+                    // 비디오 크기 확인
+                    if (video.videoWidth === 0 || video.videoHeight === 0) {
+                      reject(new Error('비디오 크기를 확인할 수 없습니다'));
+                      return;
+                    }
+                    
+                    const scale = Math.min(1, maxW / video.videoWidth, maxH / video.videoHeight);
+                    canvas.width = Math.max(1, Math.floor(video.videoWidth * scale));
+                    canvas.height = Math.max(1, Math.floor(video.videoHeight * scale));
+                    
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                      reject(new Error('Canvas 컨텍스트를 생성할 수 없습니다'));
+                      return;
+                    }
+                    
+                    // 이미지 그리기
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    // 블롭 생성
+                    canvas.toBlob((blob) => {
+                      if (blob && blob.size > 0) {
+                        console.log(`썸네일 생성 성공: ${blob.size} bytes`);
+                        resolve(blob);
+                      } else {
+                        reject(new Error('썸네일 블롭 생성 실패'));
+                      }
+                    }, 'image/jpeg', 0.9);
+                  } catch (err) {
+                    reject(err);
+                  }
+                };
+                
+                video.addEventListener('seeked', onSeeked, { once: true });
+                video.addEventListener('error', () => {
+                  clearTimeout(timeout);
+                  reject(new Error('비디오 로딩 실패'));
+                }, { once: true });
+              } catch (err) {
+                clearTimeout(timeout);
+                reject(err);
+              }
+            }, { once: true });
+            
+            video.addEventListener('error', () => {
+              clearTimeout(timeout);
+              reject(new Error('비디오 로딩 실패'));
+            }, { once: true });
+          });
+          
+          // 썸네일 업로드
+          thumbUpload = await uploadKaraokeThumbnail(capture, user.uid);
+          console.log('썸네일 업로드 성공:', thumbUpload.url);
+          return thumbUpload;
+          
+        } catch (error) {
+          console.error(`썸네일 생성 실패 (시도 ${retryCount + 1}/${maxRetries + 1}):`, error);
+          
+          if (retryCount < maxRetries) {
+            console.log('썸네일 생성 재시도...');
+            setUploadStatus(`썸네일 생성 재시도 중... (${retryCount + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, 1000)); // 1초 대기
+            return createThumbnail(retryCount + 1);
+          } else {
+            throw new Error(`썸네일 생성에 실패했습니다: ${error.message}`);
+          }
+        }
+      };
+      
+      // 썸네일 생성 시도
+      thumbUpload = await createThumbnail();
+      setUploadProgress(80);
+      
+      if (!thumbUpload || !thumbUpload.url) {
+        throw new Error('썸네일 생성에 실패했습니다. 업로드를 중단합니다.');
       }
 
-      // 게시글 데이터 생성
+      // 게시글 데이터 생성 (썸네일 필수)
+      setUploadStatus('게시글 저장 중...');
       const postData = {
         title: title.trim(),
         description: description.trim(),
@@ -135,8 +226,8 @@ const KaraokeUpload = () => {
         fileName: uploadResult.fileName,
         fileType: selectedFile.type,
         fileSize: selectedFile.size,
-        thumbnailUrl: thumbUpload?.url || null,
-        thumbnailFileName: thumbUpload?.fileName || null,
+        thumbnailUrl: thumbUpload.url, // 썸네일이 반드시 있어야 함
+        thumbnailFileName: thumbUpload.fileName,
         author: userData?.nickname || userData?.name || user?.displayName || "익명",
         authorId: user.uid,
         authorEmail: user.email
@@ -144,8 +235,10 @@ const KaraokeUpload = () => {
 
       // Firestore에 게시글 저장
       await createKaraokePost(postData);
+      setUploadProgress(100);
+      setUploadStatus('업로드 완료!');
       
-             alert("비디오 영상이 업로드되었습니다!");
+      alert("비디오 영상이 업로드되었습니다!");
       navigate("/karaoke");
     } catch (error) {
       console.error("업로드 오류:", error);
@@ -153,6 +246,7 @@ const KaraokeUpload = () => {
     } finally {
       setUploading(false);
       setUploadProgress(0);
+      setUploadStatus('');
     }
   };
 
@@ -311,7 +405,7 @@ const KaraokeUpload = () => {
             {uploading && (
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">업로드 중...</span>
+                  <span className="text-sm font-medium text-gray-700">{uploadStatus}</span>
                   <span className="text-sm text-gray-500">{uploadProgress}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
@@ -320,6 +414,11 @@ const KaraokeUpload = () => {
                     style={{ width: `${uploadProgress}%` }}
                   ></div>
                 </div>
+                {uploadStatus.includes('썸네일') && (
+                  <div className="mt-2 text-xs text-gray-600">
+                    썸네일 생성이 실패하면 업로드가 중단됩니다.
+                  </div>
+                )}
               </div>
             )}
 

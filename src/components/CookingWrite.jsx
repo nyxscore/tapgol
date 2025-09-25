@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../util/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { getCurrentUserProfile } from '../util/userService';
 import { FaArrowLeft, FaSave, FaImage, FaTimes } from 'react-icons/fa';
 
 const CookingWrite = () => {
@@ -17,6 +18,22 @@ const CookingWrite = () => {
   const [saving, setSaving] = useState(false);
   const [images, setImages] = useState([]);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [userData, setUserData] = useState(null);
+
+  // 사용자 프로필 정보 가져오기
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (user) {
+        try {
+          const profile = await getCurrentUserProfile();
+          setUserData(profile);
+        } catch (error) {
+          console.error('사용자 프로필 로드 오류:', error);
+        }
+      }
+    };
+    fetchUserProfile();
+  }, [user]);
 
   const categories = [
     '한식', '중식', '일식', '양식', '베이킹', '음료', '간식', '기타'
@@ -109,7 +126,7 @@ const CookingWrite = () => {
         content: form.content.trim(),
         category: form.category,
         images: images.map(img => img.url), // 이미지 URL 배열 추가
-        author: user?.displayName || user?.email || '익명',
+        author: userData?.nickname || userData?.name || user?.displayName || user?.email || '익명',
         authorId: user.uid,
         authorEmail: user.email,
         createdAt: serverTimestamp(),
